@@ -2,8 +2,8 @@ import time, hashlib
 from typing import List, Dict, Any, Optional
 import spacy
 from sentence_transformers import SentenceTransformer
-from models import TextDivisionRequest, TextDivisionResponse, Block
-from utils import segment_with_textsplit, spans_from_breakpoints
+from models import SegmentationRequest, SegmentationResponse, SegmentBlock
+from segmentation import segment_with_textsplit, spans_from_breakpoints
 
 
 # Если нужно — оставь свои кэши; но с app.state они уже не критичны
@@ -15,27 +15,28 @@ def split_sentences(paragraph: str, nlp):
     return [s.text.strip() for s in doc.sents if len(s.text.strip()) >= 2]
 
 def text_division(
-    req: TextDivisionRequest,
+    req: SegmentationRequest,
     nlp: Optional[spacy.language.Language] = None,
-    st_default: Optional[SentenceTransformer] = None
-) -> TextDivisionResponse:
+    st_model: Optional[SentenceTransformer] = None
+) -> SegmentationResponse:
 
     t0 = time.perf_counter()
     nlp = nlp or spacy.load("uk_core_news_sm")
     model = (
-        st_default
-        if (st_default and req.model_name == "paraphrase-xlm-r-multilingual-v1")
+        st_model
+        if (st_model and req.model_name == "paraphrase-xlm-r-multilingual-v1")
         else SentenceTransformer(req.model_name)
     )
 
     paragraphs = load_paragraphs_from_text(req.text)
 
-    all_blocks: List[Block] = []
+    all_blocks: List[SegmentBlock] = []
     debug_info: Optional[Dict[str, Any]] = {} if req.debug else None
     total_sentences = 0
 
     for pi, paragraph in enumerate(paragraphs):
         sentences = split_sentences(paragraph, nlp)
+        # sentences = split_sentences_generic(paragraph, nlp)
 
         if debug_info is not None:
             debug_info.setdefault("paragraphs", []).append({
@@ -47,11 +48,10 @@ def text_division(
             # целиком как один блок
             start = total_sentences
             end = total_sentences + len(sentences) - 1
-            all_blocks.append(Block(
+            all_blocks.append(SegmentBlock(
                 index=len(all_blocks) + 1,
                 text=" ".join(sentences),
-                span_range=(start, end),
-                intents_top=None,
+                span_range=(start, end)
             ))
             total_sentences += len(sentences)
             continue
@@ -61,8 +61,7 @@ def text_division(
         seg_out = segment_with_textsplit(sentences, embeddings,
                                          window_size=req.window_size,
                                          use_smoothing=req.smoothing.enabled,
-                                         short_sentence_word_threshold=req.smoothing.min_length,
-                                         debug=req.debug)
+                                         short_sentence_word_threshold=req.smoothing.min_length)
 
         if not isinstance(seg_out, tuple) or len(seg_out) != 2:
             blocks_text = seg_out if isinstance(seg_out, list) else [" ".join(sentences)]
@@ -70,18 +69,15 @@ def text_division(
         else:
             blocks_text, spans = seg_out
 
-        # если lengths разъехались – подгони spans
         if len(spans) != len(blocks_text):
             spans = spans_from_breakpoints(len(sentences), [])
 
-        # сдвигаем спаны на глобальные индексы
         for j, txt in enumerate(blocks_text):
             l, r = spans[j] if j < len(spans) else (0, len(sentences) - 1)
-            all_blocks.append(Block(
+            all_blocks.append(SegmentBlock(
                 index=len(all_blocks) + 1,
                 text=txt,
-                span_range=(total_sentences + l, total_sentences + r),
-                intents_top=None,
+                span_range=(total_sentences + l, total_sentences + r)
             ))
 
         total_sentences += len(sentences)
@@ -105,7 +101,7 @@ def text_division(
         "n_sentences_total": total_sentences,
     }
 
-    return TextDivisionResponse(
+    return SegmentationResponse(
         params=safe_params,
         blocks=all_blocks,
         metrics=metrics,

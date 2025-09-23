@@ -1,4 +1,5 @@
 import os
+import time
 
 import requests
 from bs4 import BeautifulSoup
@@ -10,15 +11,31 @@ SAVE_DIR = "speeches_texts"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 
-def get_latest_snapshot_url(target_url):
+def get_latest_snapshot_url(target_url, retries=5, delay=3):
+    """
+    Получает URL последнего снапшота из Wayback Machine.
+    Делает несколько попыток, если снапшот ещё не появился.
+
+    :param target_url: адрес страницы для проверки
+    :param retries: сколько раз пробовать
+    :param delay: пауза между попытками (сек)
+    :return: url снапшота или None
+    """
     params = {"url": target_url}
-    res = requests.get(WAYBACK_API, params=params)
-    data = res.json()
-    try:
-        return data["archived_snapshots"]["closest"]["url"]
-    except KeyError:
-        print("❌ Snapshot not found.")
-        return None
+
+    for attempt in range(1, retries + 1):
+        res = requests.get(WAYBACK_API, params=params)
+        data = res.json()
+        print(f"[{attempt}/{retries}] Ответ API:", data)
+
+        try:
+            return data["archived_snapshots"]["closest"]["url"]
+        except KeyError:
+            print("⏳ Снапшот не найден, ждём...")
+            time.sleep(delay)
+
+    print("❌ Snapshot так и не появился.")
+    return None
 
 def get_article_links_from_snapshot(snapshot_url):
     print(f"📥 Загрузка архива: {snapshot_url}")
