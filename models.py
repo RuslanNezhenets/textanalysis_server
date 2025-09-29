@@ -13,6 +13,7 @@ __all__ = [
     "TopicHit",
     "ClassifyRequest",
     "ClassifyResponse",
+    "SentenceResult"
 ]
 
 # =========================
