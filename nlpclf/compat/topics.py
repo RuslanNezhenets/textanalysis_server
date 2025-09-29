@@ -8,9 +8,10 @@ from sentence_transformers import SentenceTransformer
 from nlpclf.topics_agg import aggregate_block_topics_with_override
 from nlpclf.compat.base_compat import BaseCompatClassifier
 from nlpclf.compat.common import load_templates, labels_with_margin
-from text_division import text_division
+from nlpclf.segmentation.pipeline import text_division
 
-from models import TopicHit, SegmentationRequest, SentenceResult, ClassifyResponse
+
+from models.models import TopicHit, SegmentationRequest, SentenceResult, ClassifyResponse
 
 
 class TopicsClassifier(BaseCompatClassifier):
@@ -103,7 +104,8 @@ def topics_definition(
 ):
     t0 = __import__("time").perf_counter()
 
-    doc = text_division(req, nlp=nlp, st_model=st_model)
+    cfg = (getattr(clf, "config", {}) or {}).get("segmentation", {})
+    doc = text_division(req, nlp=nlp, st_model=st_model, cfg=cfg)
     if not getattr(doc, "blocks", None):
         return doc
 

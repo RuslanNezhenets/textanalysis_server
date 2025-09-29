@@ -5,7 +5,7 @@ import numpy as np
 from nlpclf.compat.base_compat import BaseCompatClassifier
 from nlpclf.compat.common import load_templates, labels_with_margin
 
-from models import IntentHit, ClassifyRequest, ClassifyResponse, SentenceResult
+from models.models import IntentHit, ClassifyRequest, ClassifyResponse, SentenceResult
 
 class IntentClassifier(BaseCompatClassifier):
     """

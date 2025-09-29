@@ -31,3 +31,15 @@ topics_override:
   rhetorical_labels: ["PROTOCOL", "VALUES"]
   rhetorical_top_threshold: 0.70
   max_reruns: 2
+
+segmentation:
+  smoothing:
+    enabled: true
+    max_words: 5
+  cut_policy: before_right
+  breakpoints:
+    drop_mult: 1.0
+    contrast_mult: 0.5
+    rel_depth_alpha: 0.60
+    min_side_frac: 0.50
+    extra_nms_radius: 0

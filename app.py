@@ -5,14 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import spacy
 from sentence_transformers import SentenceTransformer
 
+from models.models import ClassifyResponse, SegmentationRequest, ClassifyRequest
 from nlpclf.compat.intent import intent_analysis, build_intent_classifier
 from nlpclf.compat.topics import topics_definition, build_topics_classifier
-
-from models import (
-    ClassifyResponse,
-    ClassifyRequest,
-    SegmentationRequest,
-)
 
 logger = logging.getLogger(__name__)
 

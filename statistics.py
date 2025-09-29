@@ -10,7 +10,7 @@ def main():
     nlp = spacy.load("uk_core_news_sm")
 
     # Зчитування тексту
-    with open("speeches_texts/test.txt", "r", encoding="utf-8") as f:
+    with open("test.txt", "r", encoding="utf-8") as f:
         text = f.read()
 
     # Видалимо зайві пробіли
