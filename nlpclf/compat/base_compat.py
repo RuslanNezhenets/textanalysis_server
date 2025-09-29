@@ -3,14 +3,12 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from nlpclf.classifier import LabelSchema, TextClassifier
-from nlpclf.channels.cosine import CosineExemplarMax
-from nlpclf.channels.mahalanobis import CenterMahalanobis
-from nlpclf.config import load_config
 
-_CHANNELS_REGISTRY = {
-    "CosineExemplarMax": CosineExemplarMax,
-    "CenterMahalanobis": CenterMahalanobis,
-}
+from nlpclf.config import load_config
+from nlpclf.channels import CHANNELS
+
+import inspect
+
 
 class BaseCompatClassifier:
     """
@@ -32,21 +30,25 @@ class BaseCompatClassifier:
         schema = LabelSchema(templates)
         conf = load_config(config_path, cfg)
 
+        self.config: Dict[str, Any] = conf
+
         # --- Пристрої: "auto" -> None (нехай вирішує сама модель)
         device = conf.get("device", "auto")
         device = None if str(device).lower() == "auto" else str(device).lower()
 
-        # --- Канали: інстансуємо за назвою, збираємо ваги/температури
-        channels = []
-        temps: Dict[str, float] = {}
-        weights: Dict[str, float] = {}
-
-        for item in conf.get("channels", []):
-            name = item["name"]
-            cls = _CHANNELS_REGISTRY.get(name)
+        # инстанс каналов (мягкая фильтрация лишних аргументов)
+        def _instantiate(name: str, args: Dict[str, Any]):
+            cls = CHANNELS.get(name)
             if cls is None:
                 raise ValueError(f"Unknown channel: {name}")
-            inst = cls(**(item.get("args") or {}))
+            sig = inspect.signature(cls.__init__)
+            allowed = {k: v for k, v in (args or {}).items() if k in sig.parameters}
+            return cls(**allowed)
+
+        channels, temps, weights = [], {}, {}
+        for item in conf.get("channels", []):
+            name = item["name"]
+            inst = _instantiate(name, item.get("args") or {})
             channels.append(inst)
             temps[name] = float(item.get("temperature", 1.0))
             weights[name] = float(item.get("weight", 1.0))

@@ -229,7 +229,7 @@ def aggregate_block_topics_with_override(
     per_sent_hits: List[List[Dict[str, Any]]],
     agg_cfg: Dict[str, Any],
     override_cfg: Dict[str, Any],
-) -> Tuple[List[Dict[str, Any]], Dict[str, float], Dict[str, Any]]:
+):
     """
     Агрегація з «риторичним» оверрайдом: якщо топ-1 ∈ rhetorical_labels і conf < threshold — 
     прибираємо тему та перераховуємо (до max_reruns разів).

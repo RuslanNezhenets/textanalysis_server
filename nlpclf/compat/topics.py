@@ -1,13 +1,13 @@
-import time
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 import spacy
+import re
 from sentence_transformers import SentenceTransformer
 
 from nlpclf.topics_agg import aggregate_block_topics_with_override
-from .base_compat import BaseCompatClassifier
-from .common import load_templates, labels_with_margin
+from nlpclf.compat.base_compat import BaseCompatClassifier
+from nlpclf.compat.common import load_templates, labels_with_margin
 from text_division import text_division
 
 from models import TopicHit, SegmentationRequest, SentenceResult, ClassifyResponse
@@ -90,7 +90,6 @@ def _split_sentences(text: str, nlp: Optional[spacy.language.Language]) -> List[
         List[str]: Список речень без порожніх рядків.
     """
     if nlp is None:
-        import re
         return [s.strip() for s in re.split(r'(?<=[\.\!\?…])\s+', text or "") if s.strip()]
     doc = nlp(text or "")
     return [s.text.strip() for s in doc.sents if s.text.strip()]
@@ -101,7 +100,7 @@ def topics_definition(
     nlp: Optional[spacy.language.Language] = None,
     clf: Any = None,
     st_model: Optional[SentenceTransformer] = None
-) -> ClassifyResponse:
+):
     t0 = __import__("time").perf_counter()
 
     doc = text_division(req, nlp=nlp, st_model=st_model)
@@ -114,7 +113,7 @@ def topics_definition(
     override_cfg = full_cfg.get("topics_override", {}) or {}
 
     results: List[SentenceResult] = []
-    import re
+
     def _split_sentences(text: str) -> List[str]:
         return [s.strip() for s in re.split(r'(?<=[\.\!\?…])\s+', text or "") if s.strip()]
 
@@ -135,7 +134,6 @@ def topics_definition(
                         "topic": h.topic, "name": h.name,
                         "conf": float(h.conf), "low_conf": bool(getattr(h, "low_conf", False)),
                         "score": float(getattr(h, "score", 0.0)), "sim": float(getattr(h, "sim", 0.0)),
-                        # is_rhetorical можна прокидати ззовні, за потреби
                         "is_rhetorical": bool(getattr(h, "is_rhetorical", False)),
                     } for h in per_sent
                 ])

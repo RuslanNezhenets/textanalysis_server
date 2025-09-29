@@ -2,8 +2,8 @@ from typing import Any, List, Optional, Dict
 
 import numpy as np
 
-from .base_compat import BaseCompatClassifier
-from .common import load_templates, labels_with_margin
+from nlpclf.compat.base_compat import BaseCompatClassifier
+from nlpclf.compat.common import load_templates, labels_with_margin
 
 from models import IntentHit, ClassifyRequest, ClassifyResponse, SentenceResult
 
