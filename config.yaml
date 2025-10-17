@@ -1,45 +1,51 @@
-model: paraphrase-xlm-r-multilingual-v1
-device: auto
+# ====== БАЗОВІ НАЛАШТУВАННЯ ІНФЕРЕНСУ МОДЕЛІ ======
+model: paraphrase-xlm-r-multilingual-v1   # Назва sentence-transformers моделі (багатомовна, добре тримає укр/рос/англ).
+device: auto                              # 'cpu' | 'cuda' | 'auto'. 'auto' сам вибере GPU, якщо доступний.
 
+# ====== КАНАЛИ ОЦІНКИ СХОЖОСТІ / ОБЧИСЛЕННЯ БАЛІВ ======
 channels:
-  - name: CenterMahalanobis
-    weight: 0.7
-    temperature: 0.75
+  - name: CenterMahalanobis               # Канал 1: відстань до центроїдів класів у просторі ембеддингів
+    weight: 0.7                           # Вага каналу в підсумковій суміші (0..1). Тут цей канал — головний.
+    temperature: 0.75                     # Температура softmax для НОРМАЛІЗАЦІЇ балів каналу (менше = гостріший розподіл)
     args:
-      reg: 0.10
-  - name: CosineExemplarMax
-    weight: 0.3
-    temperature: 0.85
+      reg: 0.10                           # Регуляризація коваріації (λ): стабілізує обчислення відстані Махаланобіса
+  - name: CosineExemplarMax               # Канал 2: максимум косинусної схожості до прикладів класу
+    weight: 0.3                           # Вага другого каналу
+    temperature: 0.85                     # Температура softmax для косинусного каналу (трохи м’якша)
+
+# ====== ПОРОГИ ТА ЗАХИСТ ВІД ВИПАДКОВОГО ТОП-1 ======
 thresholds:
-  default: 0.48
-margin_delta: 0.07
+  default: 0.30                           # Мінімальна достовірність (після змішування та softmax), нижче — UNK/Low
+margin_delta: 0.07                        # Додатковий захист: якщо (top1 - top2) < 0.07 → вважаємо результат невпевненим
 
-# --- налаштування агрегації тем ---
+# ====== АГРЕГАЦІЯ ТЕМ У МЕЖАХ БЛОКУ ======
 topics_agg:
-  min_conf: 0.03
-  auto_units: true
-  within_sentence: sum
-  dominance_gamma: 0.50
-  dominance_cap: 0.60
-  eps: 1e-12
+  min_conf: 0.03                          # Відсікаємо слабкі гіпотези (<3%) у межах речення
+  auto_units: true                        # Автовизначення одиниць conf (0..1 чи 0..100)
+  within_sentence: sum                    # Агрегація в межах речення: 'sum' складає всі, 'max' бере максимум
+  dominance_gamma: 0.50                   # Сила домінантного буста: наскільки підсилювати теми, що домінують у реченнях
+  dominance_cap: 0.60                     # Максимальна межа буста (щоб не зламати баланс)
+  eps: 1e-12                              # Числова стабільність
   tie:
-    top_k: 3
-    delta_abs: 0.02
-    delta_rel: 0.06
+    top_k: 3                              # Перевіряємо «нічиї» серед перших 3 тем
+    delta_abs: 0.02                       # Абсолютна смуга нічиєї (±0.02 від лідера)
+    delta_rel: 0.06                       # Відносна смуга нічиєї (6% від лідера)
 
+# ====== РИТОРИЧНИЙ ОВЕРРАЙД ======
 topics_override:
-  rhetorical_labels: ["PROTOCOL", "VALUES"]
-  rhetorical_top_threshold: 0.70
-  max_reruns: 2
+  rhetorical_labels: ["PROTOCOL", "VALUES"] # Які теми вважати риторичними
+  rhetorical_top_threshold: 0.70            # Якщо риторика топ-1, але <70% впевненості → відкидаємо і перерахуємо
+  max_reruns: 2                             # Скільки разів дозволено відкидати підряд (щоб уникнути циклів)
 
+# ====== СЕГМЕНТАЦІЯ ТЕКСТУ НА СМИСЛОВІ БЛОКИ ======
 segmentation:
   smoothing:
-    enabled: true
-    max_words: 5
-  cut_policy: before_right
+    enabled: true                         # Чи згладжувати короткі речення
+    max_words: 5                          # Поріг «короткості»: ≤5 слів
+  cut_policy: before_right                # Де ставити розрив: «перед правою долиною»
   breakpoints:
-    drop_mult: 1.0
-    contrast_mult: 0.5
-    rel_depth_alpha: 0.60
-    min_side_frac: 0.50
-    extra_nms_radius: 0
+    drop_mult: 1.0                        # Множник вимоги до «глибини провалу»
+    contrast_mult: 0.5                    # Вимога контрастності з околицями
+    rel_depth_alpha: 0.60                 # Мінімальна відносна глибина провалу (60%)
+    min_side_frac: 0.50                   # Мінімальна частка контексту зліва/справа (50%)
+    extra_nms_radius: 0                   # Додаткове придушення близьких точок розриву (0 = вимкнено)

@@ -145,7 +145,7 @@ def topics_definition(
         results.append(SentenceResult(
             id=idx,
             text=block_text,
-            top=top_topics,
+            top=top_topics[:req.top_k],
             span_range=getattr(blk, "span_range", None),
         ))
 

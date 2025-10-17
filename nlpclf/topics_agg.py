@@ -200,7 +200,6 @@ def aggregate_block_topics(sent_hits: List[List[Dict[str, Any]]], cfg: Dict[str,
     final_prob = {t: (v / Z if Z > eps else 0.0) for t, v in final_score.items()}
     items = sorted(final_prob.items(), key=lambda kv: kv[1], reverse=True)
 
-    # 6) Формуємо топ-3
     def _conf_label(p: float, low: bool) -> str:
         if low:
             return "Low"
@@ -211,7 +210,7 @@ def aggregate_block_topics(sent_hits: List[List[Dict[str, Any]]], cfg: Dict[str,
         return "Low"
 
     top_hits = []
-    for i, (t, p) in enumerate(items[:3]):
+    for i, (t, p) in enumerate(items):
         low = (i in tie_low_idxs)
         top_hits.append({
             "topic": t,

@@ -1,13 +1,16 @@
 import logging
+from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import spacy
 from sentence_transformers import SentenceTransformer
 
-from models.models import ClassifyResponse, SegmentationRequest, ClassifyRequest
+from models.models import ClassifyResponse, SegmentationRequest, ClassifyRequest, StatsRequest, AnalyzeResponse, AnalyzeRequest
 from nlpclf.compat.intent import intent_analysis, build_intent_classifier
 from nlpclf.compat.topics import topics_definition, build_topics_classifier
+from sentiment_service import analyze_sentiment
+from statistics import compute_text_stats
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +48,30 @@ def init_resources():
     except Exception as e:
         logger.exception("Ошибка инициализации моделей")
         raise
+
+@app.post("/stats", response_model=Dict[str, Any])
+def text_stats(req: StatsRequest):
+    """
+    Возвращает численную статистику текста (слова, предложения, уникальные, средние,
+    лексическая плотность, топ-слова/биграммы, оценка времени чтения и т.д.).
+    """
+    if not req.text or len(req.text.strip()) < 2:
+        raise HTTPException(400, "Пустой или слишком короткий текст")
+
+    try:
+        stats = compute_text_stats(
+            req.text,
+            spacy_model=req.spacy_model or "uk_core_news_sm",
+            top_n_words=req.top_n_words,
+            top_n_bigrams=req.top_n_bigrams
+        )
+        return stats
+    except Exception as e:
+        raise HTTPException(500, f"Ошибка выполнения /stats: {e}")
+
+@app.post("/analyze", response_model=AnalyzeResponse)
+def analyze(req: AnalyzeRequest):
+    return analyze_sentiment(req.text, include_raw=req.include_raw, low_conf_threshold=req.low_conf_threshold)
 
 @app.post("/segment", response_model=ClassifyResponse, response_model_exclude_none=True)
 def segment_text(req: SegmentationRequest):

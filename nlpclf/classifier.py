@@ -185,7 +185,7 @@ class TextClassifier:
                 id=i,
                 text=txt,
                 labels=labels,  # повний відсортований список
-                raw_scores={n: raws[n].tolist() for n in raws} if return_channel_scores else None,
+                top={n: raws[n].tolist() for n in raws} if return_channel_scores else None,
             )
             out.append(pred)
 

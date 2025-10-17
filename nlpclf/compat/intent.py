@@ -109,7 +109,7 @@ def intent_analysis(req: ClassifyRequest, clf: Any) -> ClassifyResponse:
             if getattr(req, "debug", False):
                 payload.update({"score": float(h.score), "sim": float(h.sim)})
             intents.append(payload)
-        results.append(SentenceResult(id=idx, text=sent, top=intents))
+        results.append(SentenceResult(id=idx, text=sent, top=intents[:req.top_k]))
 
     metrics = {
         "latency_ms": round((time.perf_counter() - t0) * 1000, 2),

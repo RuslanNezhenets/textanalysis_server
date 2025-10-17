@@ -1,5 +1,5 @@
-from typing import List, Optional, Dict, Any, Tuple
-from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any, Tuple, Literal
+from pydantic import BaseModel, Field, constr, conint
 from pydantic import ConfigDict
 
 __all__ = [
@@ -13,7 +13,10 @@ __all__ = [
     "TopicHit",
     "ClassifyRequest",
     "ClassifyResponse",
-    "SentenceResult"
+    "SentenceResult",
+    "StatsRequest",
+    "AnalyzeRequest",
+    "AnalyzeResponse"
 ]
 
 # =========================
@@ -45,6 +48,7 @@ class SegmentationRequest(BaseModel):
     window_size: int = Field(3, ge=1, le=50)
     model_name: str = Field("paraphrase-xlm-r-multilingual-v1", description="Назва SentenceTransformer-моделі")
     smoothing: SmoothingConfig = Field(default_factory=SmoothingConfig, description="Конфіг згладжування коротких речень")
+    top_k: int = Field(3, ge=1, le=12)
     debug: bool = Field(False, description="Повернути діагностику обчислень")
 
 
@@ -130,3 +134,40 @@ class ClassifyResponse(BaseModel):
     results: List[SentenceResult]
     metrics: Dict[str, Any]
 
+
+
+class StatsRequest(BaseModel):
+    text: constr(strip_whitespace=True, min_length=2) = Field(..., description="Сырой текст")
+    top_n_words: conint(ge=1, le=100) = Field(10, description="Сколько топ-слов вернуть")
+    top_n_bigrams: conint(ge=1, le=100) = Field(10, description="Сколько топ-биграм вернуть")
+    reading_speed_wpm: conint(ge=100, le=400) = Field(200, description="Скорость чтения, слов/мин")
+    spacy_model: Optional[str] = Field(None, description="Имя модели spaCy (по умолчанию uk_core_news_sm)")
+
+class TopEntry(BaseModel):
+    name: str
+    conf: float
+    sentiment: str
+
+class SentSentenceOut(BaseModel):
+    idx: int
+    text: str
+    label: str
+    score: float
+    low_conf: bool
+    top: Optional[List[TopEntry]] = None
+    span_range: Optional[Tuple[int, int]] = None
+
+class SummaryOut(BaseModel):
+    label: str
+    score: float
+    avg: Dict[str, float]
+    counts: Dict[str, int]
+
+class AnalyzeResponse(BaseModel):
+    summary: SummaryOut
+    sentences: List[SentSentenceOut]
+
+class AnalyzeRequest(BaseModel):
+    text: str
+    include_raw: bool = Field(False, description="Возвращать ли raw_scores по предложениям"),
+    low_conf_threshold: float = Field(0.55, ge=0.0, le=1.0)
