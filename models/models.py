@@ -15,8 +15,8 @@ __all__ = [
     "ClassifyResponse",
     "SentenceResult",
     "StatsRequest",
-    "AnalyzeRequest",
-    "AnalyzeResponse"
+    "SentimentRequest",
+    "SentimentResponse"
 ]
 
 # =========================
@@ -45,6 +45,7 @@ class SegmentBlock(BaseModel):
 class SegmentationRequest(BaseModel):
     """Вхід для /segment — параметри розбиття тексту на блоки."""
     text: str = Field(..., description="Вхідний текст для розбиття")
+    tab_id: str
     window_size: int = Field(3, ge=1, le=50)
     model_name: str = Field("paraphrase-xlm-r-multilingual-v1", description="Назва SentenceTransformer-моделі")
     smoothing: SmoothingConfig = Field(default_factory=SmoothingConfig, description="Конфіг згладжування коротких речень")
@@ -103,6 +104,7 @@ class TopicHit(_BaseLabelHit):
 class ClassifyRequest(BaseModel):
     """Вхід для /intent — сирий текст + налаштування класифікатора."""
     text: str
+    tab_id: str
     top_k: int = Field(3, ge=1, le=10)
     model_name: str = Field(
         "paraphrase-xlm-r-multilingual-v1",
@@ -138,9 +140,9 @@ class ClassifyResponse(BaseModel):
 
 class StatsRequest(BaseModel):
     text: constr(strip_whitespace=True, min_length=2) = Field(..., description="Сырой текст")
+    tab_id: str
     top_n_words: conint(ge=1, le=100) = Field(10, description="Сколько топ-слов вернуть")
     top_n_bigrams: conint(ge=1, le=100) = Field(10, description="Сколько топ-биграм вернуть")
-    reading_speed_wpm: conint(ge=100, le=400) = Field(200, description="Скорость чтения, слов/мин")
     spacy_model: Optional[str] = Field(None, description="Имя модели spaCy (по умолчанию uk_core_news_sm)")
 
 class TopEntry(BaseModel):
@@ -163,11 +165,12 @@ class SummaryOut(BaseModel):
     avg: Dict[str, float]
     counts: Dict[str, int]
 
-class AnalyzeResponse(BaseModel):
-    summary: SummaryOut
-    sentences: List[SentSentenceOut]
-
-class AnalyzeRequest(BaseModel):
+class SentimentRequest(BaseModel):
     text: str
+    tab_id: str
     include_raw: bool = Field(False, description="Возвращать ли raw_scores по предложениям"),
     low_conf_threshold: float = Field(0.55, ge=0.0, le=1.0)
+
+class SentimentResponse(BaseModel):
+    summary: SummaryOut
+    sentences: List[SentSentenceOut]
