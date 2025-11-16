@@ -1,6 +1,6 @@
 import logging
 import os
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
 from fastapi import FastAPI
 from dotenv import load_dotenv
@@ -26,12 +26,10 @@ def init_mongo(app: FastAPI):
 
         main_coll = db[coll_name]
 
-        workspace_coll = db["workspace_tabs"]
-
         app.state.mongo_client = client
         app.state.mongo_db = db
         app.state.mongo_sessions = main_coll
-        app.state.workspace_coll = workspace_coll
+        app.state.tabs_db = db["tabs"]
 
         logger.info("MongoDB подключена успешно.")
     except Exception:
@@ -41,3 +39,26 @@ def init_mongo(app: FastAPI):
 
 def get_sessions_collection(app: FastAPI) -> Collection:
     return app.state.mongo_sessions
+
+def get_users_collection(app) -> Collection:
+    coll: Collection = app.state.mongo_db["users"]
+    # уникальный индекс по email
+    coll.create_index([("email", ASCENDING)], unique=True, name="uniq_email")
+    return coll
+
+def get_tokens_collection(app) -> Collection:
+    coll: Collection = app.state.mongo_db["auth_tokens"]
+    # индекс по token и по expires_at для TTL-очистки
+    coll.create_index([("token", ASCENDING)], unique=True, name="uniq_token")
+    # TTL: документы будут удаляться по expires_at автоматически
+    # В Mongo TTL индекс требует поле типа Date и имя индекса, expireAfterSeconds=0
+    try:
+        coll.create_index("expires_at", expireAfterSeconds=0, name="ttl_expires")
+    except Exception:
+        # индекс может уже существовать; игнорируем расхождения
+        pass
+    return coll
+
+def get_tabs_collection(app) -> Collection:
+    # прежняя "sessions" на самом деле хранит вкладки — даём явное имя
+    return app.state.mongo_db["tabs"]

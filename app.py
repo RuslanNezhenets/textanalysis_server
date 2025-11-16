@@ -15,6 +15,7 @@ from db.mongo import init_mongo
 
 from routers.workspace_router import router as workspace_router, apply_tab_patch, get_tab_full_service
 from routers.report_router import router as report_assets_router
+from routers.auth_router import router as auth_router
 
 
 logging.basicConfig(
@@ -60,6 +61,7 @@ def init_resources():
 
 app.include_router(workspace_router)
 app.include_router(report_assets_router)
+app.include_router(auth_router)
 
 @app.post("/api/stats", response_model=Dict[str, Any])
 def text_stats(req: StatsRequest):
@@ -77,8 +79,8 @@ def text_stats(req: StatsRequest):
             top_n_bigrams=req.top_n_bigrams
         )
 
-        coll = app.state.workspace_coll
-        tab_doc = get_tab_full_service(coll, req.tab_id)
+        tabs_db = app.state.tabs_db
+        tab_doc = get_tab_full_service(tabs_db, req.tab_id)
         current_analysis = tab_doc.get("analysis", {}) or {}
         new_analysis = {
             "stats": {
@@ -99,7 +101,7 @@ def text_stats(req: StatsRequest):
             "analysis": new_analysis,
         }
 
-        apply_tab_patch(coll, req.tab_id, patch)
+        apply_tab_patch(tabs_db, req.tab_id, patch)
 
         return stats
     except Exception as e:
@@ -113,8 +115,8 @@ def text_sentiment(req: SentimentRequest):
         low_conf_threshold=req.low_conf_threshold
     )
 
-    coll = app.state.workspace_coll
-    tab_doc = get_tab_full_service(coll, req.tab_id)
+    tabs_db = app.state.tabs_db
+    tab_doc = get_tab_full_service(tabs_db, req.tab_id)
     current_analysis = tab_doc.get("analysis", {}) or {}
     new_analysis = {
         "stats": current_analysis.get("stats"),
@@ -134,7 +136,7 @@ def text_sentiment(req: SentimentRequest):
         "analysis": new_analysis,
     }
 
-    apply_tab_patch(coll, req.tab_id, patch)
+    apply_tab_patch(tabs_db, req.tab_id, patch)
 
     return sentiment
 
@@ -149,8 +151,8 @@ def segment_text(req: SegmentationRequest):
     try:
         segment = topics_definition(req, clf=app.state.topic_clf, st_model=app.state.st_model)
 
-        coll = app.state.workspace_coll
-        tab_doc = get_tab_full_service(coll, req.tab_id)
+        tabs_db = app.state.tabs_db
+        tab_doc = get_tab_full_service(tabs_db, req.tab_id)
         current_analysis = tab_doc.get("analysis", {}) or {}
         new_analysis = {
             "stats": current_analysis.get("stats"),
@@ -172,7 +174,7 @@ def segment_text(req: SegmentationRequest):
             "analysis": new_analysis,
         }
 
-        apply_tab_patch(coll, req.tab_id, patch)
+        apply_tab_patch(tabs_db, req.tab_id, patch)
 
         return segment
     except Exception as e:
@@ -185,8 +187,8 @@ def classify_intents(req: ClassifyRequest):
     try:
         intent = intent_analysis(req, clf=app.state.intent_clf)
 
-        coll = app.state.workspace_coll
-        tab_doc = get_tab_full_service(coll, req.tab_id)
+        tabs_db = app.state.tabs_db
+        tab_doc = get_tab_full_service(tabs_db, req.tab_id)
         current_analysis = tab_doc.get("analysis", {}) or {}
         new_analysis = {
             "stats": current_analysis.get("stats"),
@@ -206,7 +208,7 @@ def classify_intents(req: ClassifyRequest):
             "analysis": new_analysis,
         }
 
-        apply_tab_patch(coll, req.tab_id, patch)
+        apply_tab_patch(tabs_db, req.tab_id, patch)
 
         return intent
     except Exception as e:

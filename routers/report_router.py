@@ -5,32 +5,16 @@ import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 router = APIRouter(prefix="/api/report", tags=["report"])
 
 # --- пути ---
-TEMPLATES_DIR = Path("templates")   # report.html лежит здесь
-STATIC_DIR = Path("static")         # pdf_title.css, analysis_table.css
-
-
-# ====== модели запроса ======
-
-class ReportAnalysis(BaseModel):
-    stats: Optional[dict] = None
-    sentiment: Optional[dict] = None
-    segment: Optional[dict] = None
-    intent: Optional[dict] = None
-
-
-class ReportPayload(BaseModel):
-    title: str
-    analysis: ReportAnalysis
+TEMPLATES_DIR = Path("templates")  # report.html лежит здесь
+STATIC_DIR = Path("static")  # pdf_title.css, analysis_table.css
 
 
 # ====== helpers из второго скрипта ======
@@ -56,10 +40,10 @@ def html_to_pdf_via_browser(html_path: Path, pdf_path: Path, browser_path: str) 
     url = html_path.resolve().as_uri()
     cmd = [
         browser_path,
-        "--headless=new",                 # для новых версий Chromium
+        "--headless=new",  # для новых версий Chromium
         "--disable-gpu",
         f"--print-to-pdf={str(pdf_path.resolve())}",
-        "--print-to-pdf-no-header",       # без футера/хедера
+        "--print-to-pdf-no-header",  # без футера/хедера
         url,
     ]
     completed = subprocess.run(
@@ -96,7 +80,7 @@ def get_jinja_env() -> Environment:
     )
 
 
-def build_pdf_bytes_from_payload(payload: ReportPayload) -> bytes:
+def build_pdf_bytes_from_payload(payload) -> bytes:
     """
     Основная логика из generate_report(), только
     вместо json.json используем payload, а PDF возвращаем байтами.
@@ -105,16 +89,16 @@ def build_pdf_bytes_from_payload(payload: ReportPayload) -> bytes:
     template = env.get_template("report.html")
 
     # Приводим данные к тому виду, который ожидался во втором скрипте
-    a = payload.analysis
+    a = payload['analysis']
 
     data = {
         "report_title": "Результати аналізу тексту",
-        "text_name": payload.title,
+        "text_name": payload['text_name'],
         "date_str": get_current_date(),
-        "stats":     (a.stats or {}).get("results") if a.stats else None,
-        "sentiment": (a.sentiment or {}).get("results") if a.sentiment else None,
-        "segments":  (a.segment or {}).get("results") if a.segment else None,
-        "intents":   (a.intent or {}).get("results") if a.intent else None,
+        "stats": (a['stats'] or {}).get("results") if a['stats'] else None,
+        "sentiment": (a['sentiment'] or {}).get("results") if a['sentiment'] else None,
+        "segments": (a['segment'] or {}).get("results") if a['segment'] else None,
+        "intents": (a['intent'] or {}).get("results") if a['intent'] else None,
     }
 
     # абсолютные file:// ссылки на css
@@ -156,12 +140,29 @@ def build_pdf_bytes_from_payload(payload: ReportPayload) -> bytes:
 
 # ====== FastAPI-роут ======
 
-@router.post("/build", response_class=StreamingResponse)
-def build_report(payload: ReportPayload):
+@router.post("/build/{tab_id}", response_class=StreamingResponse)
+def build_report_for_tab(tab_id: str, request: Request):
     """
-    Принимает JSON с результатами анализа текста и возвращает PDF,
-    сгенерированный через headless Chrome/Edge по шаблону report.html.
+    Строит PDF-отчёт по данным вкладки tab_id:
+    - достаёт таб из Mongo
+    - забирает из него analysis
+    - рендерит PDF
     """
+    tabs_db = request.app.state.tabs_db
+
+    tab_doc = tabs_db.find_one({"_id": tab_id})
+    if not tab_doc:
+        raise HTTPException(status_code=404, detail="Tab not found")
+
+    analysis = tab_doc.get("analysis") or {}
+    if not analysis:
+        raise HTTPException(status_code=400, detail="No analysis data for this tab")
+
+    payload = {
+        'text_name': tab_doc.get("title") or "Звіт аналізу тексту",
+        'analysis': analysis
+    }
+
     try:
         pdf_bytes = build_pdf_bytes_from_payload(payload)
     except FileNotFoundError as e:
@@ -175,7 +176,6 @@ def build_report(payload: ReportPayload):
 
     buf = io.BytesIO(pdf_bytes)
     buf.seek(0)
-
     filename = f"report-{datetime.now().strftime('%Y%m%d-%H%M%S')}.pdf"
 
     return StreamingResponse(

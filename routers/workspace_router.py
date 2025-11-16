@@ -1,22 +1,19 @@
 import uuid
 from datetime import datetime
+from typing import Dict, Any
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pymongo.collection import Collection
 
-from models.workspace import (
-    WorkspaceTabLight,
-    WorkspaceTabFull,
-    NewTabRequest,
-    AnalysisBlock,
-)
-from db.mongo import get_sessions_collection
+from models.workspace import WorkspaceTabLight, WorkspaceTabFull, NewTabRequest, AnalysisBlock
+from db.mongo import get_tabs_collection
+from routers.auth_router import get_current_user
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
 
-def _get_collection(req: Request) -> Collection:
-    return get_sessions_collection(req.app)
-
+def _tabs(req: Request) -> Collection:
+    return get_tabs_collection(req.app)
 
 def _doc_to_full(doc: dict) -> WorkspaceTabFull:
     return WorkspaceTabFull(
@@ -26,9 +23,8 @@ def _doc_to_full(doc: dict) -> WorkspaceTabFull:
         updated_at=doc.get("updated_at"),
         text_id=doc.get("text_id", 0),
         text=doc.get("text", ""),
-        analysis=AnalysisBlock(**doc.get("analysis", {})),
+        analysis=AnalysisBlock(**(doc.get("analysis") or {})),
     )
-
 
 def _doc_to_light(doc: dict) -> WorkspaceTabLight:
     return WorkspaceTabLight(
@@ -37,178 +33,121 @@ def _doc_to_light(doc: dict) -> WorkspaceTabLight:
         created_at=doc.get("created_at"),
     )
 
-
-def get_tab_full_service(coll: Collection, tab_id: str) -> dict:
-    """
-    Достаёт вкладку целиком (текст, анализ и т.д.) как raw dict из Mongo.
-    Если не найдено — кидает HTTPException(404).
-    """
-    doc = coll.find_one({"_id": tab_id})
-    if not doc:
-        raise HTTPException(404, "tab not found")
-
-    return doc
-
-
-def apply_tab_patch(coll: Collection, tab_id: str, patch_data: dict) -> dict:
-    """
-    Частично обновляет вкладку.
-    Возвращает документ вкладки ПОСЛЕ обновления (raw dict).
-    Кидает HTTPException, чтобы поведение совпадало с API.
-    """
-
-    doc = coll.find_one({"_id": tab_id})
-    if not doc:
-        raise HTTPException(404, "tab not found")
-
-    updatable_fields = ["title", "text_id", "text", "analysis"]
-
-    update_payload = {}
-    for field in updatable_fields:
-        if field in patch_data:
-            update_payload[field] = patch_data[field]
-
-    update_payload["updated_at"] = datetime.utcnow()
-
-    # Если менять нечего кроме updated_at -> возвращаем "как есть"
-    if len(update_payload) == 1 and "updated_at" in update_payload:
-        return doc
-
-    coll.update_one(
-        {"_id": tab_id},
-        {"$set": update_payload}
-    )
-
-    new_doc = coll.find_one({"_id": tab_id})
-    if not new_doc:
-        raise HTTPException(500, "tab disappeared after update")
-
-    return new_doc
-
+def _ensure_owner(doc: dict, user_id: str):
+    if doc.get("user_id") != user_id:
+        raise HTTPException(403, "forbidden")
 
 @router.get("/tabs", response_model=list[WorkspaceTabLight])
-def list_tabs(
-    coll: Collection = Depends(_get_collection)
-):
-    """
-    Вернуть список вкладок (лайт-вариант).
-    Без текста и анализа.
-    """
+def list_tabs(coll: Collection = Depends(_tabs),
+              user=Depends(get_current_user)):
     cursor = coll.find(
-        {},
-        {
-            "_id": 1,
-            "title": 1,
-            "created_at": 1,
-        },
+        {"user_id": user["_id"]},
+        {"_id": 1, "title": 1, "created_at": 1},
         sort=[("created_at", 1)]
     )
-
     return [_doc_to_light(doc) for doc in cursor]
 
-
 @router.get("/tabs/{tab_id}", response_model=WorkspaceTabFull)
-def get_tab_full(
-    tab_id: str,
-    coll: Collection = Depends(_get_collection)
-):
-    """
-    Вернуть полную инфу по конкретной вкладке: текст, анализ, всё.
-    """
-    doc = get_tab_full_service(coll, tab_id)
+def get_tab_full(tab_id: str,
+                 coll: Collection = Depends(_tabs),
+                 user=Depends(get_current_user)):
+    doc = coll.find_one({"_id": tab_id})
+    if not doc:
+        raise HTTPException(404, "tab not found")
+    _ensure_owner(doc, user["_id"])
     return _doc_to_full(doc)
 
 
 @router.post("/tabs", response_model=WorkspaceTabFull)
-def create_tab(
-    body: NewTabRequest | None = None,
-    coll: Collection = Depends(_get_collection)
-):
-    """
-    Создать новую вкладку и вернуть её полную версию.
-    """
-
-    new_tab_id = str(uuid.uuid4())
+def create_tab(body: NewTabRequest | None = None,
+               coll: Collection = Depends(_tabs),
+               user=Depends(get_current_user)):
     now = datetime.utcnow()
-
     new_doc = {
-        "_id": new_tab_id,
+        "_id": str(uuid.uuid4()),
+        "user_id": user["_id"],          # ← привязка владельца
         "title": body.title if body and body.title else "Нова вкладка",
         "created_at": now,
         "updated_at": now,
-
         "text_id": 0,
         "text": "",
-        "analysis": {
-            "stats": None,
-            "sentiment": None,
-            "segment": None,
-            "intent": None,
-        }
+        "analysis": {"stats": None, "sentiment": None, "segment": None, "intent": None}
     }
-
     coll.insert_one(new_doc)
-
     return _doc_to_full(new_doc)
-
 
 @router.patch("/tabs/{tab_id}", response_model=WorkspaceTabFull)
-def update_tab(
-    tab_id: str,
-    patch_data: dict,
-    coll: Collection = Depends(_get_collection)
-):
-    new_doc = apply_tab_patch(coll, tab_id, patch_data)
-    return _doc_to_full(new_doc)
+def update_tab(tab_id: str, patch_data: dict,
+               coll: Collection = Depends(_tabs),
+               user=Depends(get_current_user)):
+    doc = coll.find_one({"_id": tab_id})
+    if not doc:
+        raise HTTPException(404, "tab not found")
+    _ensure_owner(doc, user["_id"])
+
+    updatable = {k: v for k, v in patch_data.items() if k in {"title", "text_id", "text", "analysis"}}
+    updatable["updated_at"] = datetime.utcnow()
+    if len(updatable) == 1:
+        return _doc_to_full(doc)
+
+    coll.update_one({"_id": tab_id}, {"$set": updatable})
+    return _doc_to_full(coll.find_one({"_id": tab_id}) or doc)
 
 
 @router.delete("/tabs/{tab_id}")
-def delete_tab(
-    tab_id: str,
-    coll: Collection = Depends(_get_collection)
-):
-    """
-    Удалить вкладку полностью.
-    """
-    res = coll.delete_one({"_id": tab_id})
-    if res.deleted_count == 0:
+def delete_tab(tab_id: str,
+               coll: Collection = Depends(_tabs),
+               user=Depends(get_current_user)):
+    doc = coll.find_one({"_id": tab_id})
+    if not doc:
         raise HTTPException(404, "tab not found")
+    _ensure_owner(doc, user["_id"])
 
+    coll.delete_one({"_id": tab_id})
     return {"ok": True}
 
-def apply_tab_patch(coll: Collection, tab_id: str, patch_data: dict) -> dict:
+def get_tab_full_service(coll: Collection, tab_id: str) -> dict:
     """
-    Сервисная функция без FastAPI-магии.
-    Возвращает документ вкладки ПОСЛЕ обновления (чистый dict из Mongo).
-    Кидает HTTPException, чтобы поведение оставалось тем же.
+    Простой helper: достаёт вкладку по id (без учёта пользователя).
+    Удобен для внутренних сервисов (например /api/stats).
     """
+    doc = coll.find_one({"_id": tab_id})
+    if not doc:
+        raise HTTPException(404, "tab not found")
+    return doc
 
+def apply_tab_patch(
+    coll: Collection,
+    tab_id: str,
+    patch_data: Dict[str, Any],
+) -> dict:
+    """
+    Универсальный сервисный апдейтер вкладки.
+    НИЧЕГО не знает о пользователях — просто патчит документ.
+    Его можно вызывать:
+      - из роутеров (после проверки владельца, если нужно),
+      - из других сервисов (/api/stats, /api/segment и т.п.).
+    """
     doc = coll.find_one({"_id": tab_id})
     if not doc:
         raise HTTPException(404, "tab not found")
 
     updatable_fields = ["title", "text_id", "text", "analysis"]
 
-    update_payload = {}
+    update_payload: Dict[str, Any] = {}
     for field in updatable_fields:
         if field in patch_data:
             update_payload[field] = patch_data[field]
 
-    # в любом случае, если апдейтим — поменяем updated_at
+    # в любом апдейте обновляем updated_at
     update_payload["updated_at"] = datetime.utcnow()
 
+    # если реально нечего менять кроме updated_at — не трогаем базу
     if len(update_payload) == 1 and "updated_at" in update_payload:
-        # ничего кроме updated_at мы не меняем => просто вернём старое (но с обновлённой датой не будем лезть в базу)
         return doc
 
-    coll.update_one(
-        {"_id": tab_id},
-        {"$set": update_payload}
-    )
-
+    coll.update_one({"_id": tab_id}, {"$set": update_payload})
     new_doc = coll.find_one({"_id": tab_id})
     if not new_doc:
-        # это очень маловероятно, но формально надо обработать
         raise HTTPException(500, "tab disappeared after update")
-
     return new_doc

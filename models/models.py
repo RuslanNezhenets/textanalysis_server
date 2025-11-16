@@ -171,3 +171,14 @@ class SentimentRequest(BaseModel):
 class SentimentResponse(BaseModel):
     summary: SummaryOut
     sentences: List[SentSentenceOut]
+
+
+class ReportAnalysis(BaseModel):
+    stats: Optional[dict] = None
+    sentiment: Optional[dict] = None
+    segment: Optional[dict] = None
+    intent: Optional[dict] = None
+
+class ReportPayload(BaseModel):
+    title: str
+    analysis: ReportAnalysis
