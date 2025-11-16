@@ -1,0 +1,148 @@
+{# ---- агрегаты по тональностям ---- #}
+{% set ns = namespace(pos=0, neu=0, neg=0) %}
+{% for s in sentiment.sentences %}
+{% if s.label == 'positive' %}{% set ns.pos = ns.pos + 1 %}
+{% elif s.label == 'neutral' %}{% set ns.neu = ns.neu + 1 %}
+{% elif s.label == 'negative' %}{% set ns.neg = ns.neg + 1 %}
+{% endif %}
+{% endfor %}
+{% set total = ns.pos + ns.neu + ns.neg %}
+{% set p_pos = (100.0 * ns.pos / total) if total else 0 %}
+{% set p_neu = (100.0 * ns.neu / total) if total else 0 %}
+{% set p_neg = (100.0 * ns.neg / total) if total else 0 %}
+
+{# визначаємо домінуючу тональність #}
+{% set dominant = 'neutral' %}
+{% set dominant_pct = p_neu %}
+{% if p_pos >= p_neu and p_pos >= p_neg %}
+{% set dominant = 'positive' %}
+{% set dominant_pct = p_pos %}
+{% elif p_neg >= p_pos and p_neg >= p_neu %}
+{% set dominant = 'negative' %}
+{% set dominant_pct = p_neg %}
+{% endif %}
+
+<div class="section-header">
+    <h1>Аналіз тональності тексту</h1>
+</div>
+
+<p>
+    На цьому етапі виконується покомпонентний аналіз тональності: кожне речення тексту
+    класифікується як <b>позитивне</b>, <b>нейтральне</b> або <b>негативне</b>,
+    а також оцінюється рівень впевненості моделі у своїй відповіді.
+    У зведених показниках нижче наведено частку речень кожного типу,
+    а детальна таблиця дозволяє співвіднести тональність із конкретними фрагментами промови.
+</p>
+
+<div class="subtitle">
+    Кількість речень: {{ total }}
+</div>
+<div class="summary-row">
+    <div class="summary-chip pos">
+        <div class="label">Позитивні</div>
+        <div class="value">{{ ns.pos }}</div>
+        <div class="pct">{{ p_pos|round(1) }}%</div>
+    </div>
+    <div class="summary-chip neu">
+        <div class="label">Нейтральні</div>
+        <div class="value">{{ ns.neu }}</div>
+        <div class="pct">{{ p_neu|round(1) }}%</div>
+    </div>
+    <div class="summary-chip neg">
+        <div class="label">Негативні</div>
+        <div class="value">{{ ns.neg }}</div>
+        <div class="pct">{{ p_neg|round(1) }}%</div>
+    </div>
+</div>
+
+<table class="analysis-table">
+    <thead>
+    <tr>
+        <th class="col-idx">#</th>
+        <th>Речення</th>
+        <th>Основна тональність</th>
+        <th>Top-3 оцінки моделі</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for s in sentiment.sentences %}
+    {% set lbl = s.label %}
+    <tr>
+        <td class="col-idx">{{ s.idx }}</td>
+
+        <td>
+            <div class="sent-text">{{ s.text }}</div>
+        </td>
+
+        <td>
+            {% set cls = 'neu' %}
+            {% if lbl == 'positive' %}{% set cls = 'pos' %}
+            {% elif lbl == 'negative' %}{% set cls = 'neg' %}
+            {% endif %}
+
+            <div>
+                <span class="sent-label {{ cls }}">{{ lbl }}</span>
+            </div>
+            <div class="sent-score">
+                {{ (s.score * 100)|round(1) }}%
+            </div>
+            {% if s.low_conf %}
+            <div class="sent-low-flag">низька впевненість</div>
+            {% endif %}
+        </td>
+
+        <td>
+            {% if s.top %}
+            <div class="top-list">
+                {% for t in s.top %}
+                {% set tcls = 'neu' %}
+                {% if t.sentiment == 'positive' %}{% set tcls = 'pos' %}
+                {% elif t.sentiment == 'negative' %}{% set tcls = 'neg' %}{% endif %}
+                <div class="top-item">
+                    <span class="top-name">{{ t.name }}</span>
+                    <span class="top-conf">{{ (t.conf * 100)|round(1) }}%</span>
+                    <span class="top-label {{ tcls }}">{{ t.conf_label }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div>
+  {% if total > 0 %}
+    {% if dominant == 'positive' %}
+      <p>
+        У цілому текст демонструє переважно
+        <b>позитивну тональність</b> ({{ dominant_pct|round(1) }}% речень),
+        що свідчить про акцент на підтримці, подяці та мобілізуючих меседжах.
+      </p>
+    {% elif dominant == 'neutral' %}
+      <p>
+        Загалом текст має переважно
+        <b>нейтральний характер</b> ({{ dominant_pct|round(1) }}% речень):
+        переважають описові та інформативні фрагменти без яскраво вираженого емоційного забарвлення.
+      </p>
+    {% else %}
+      <p>
+        У тексті домінує
+        <b>негативна тональність</b> ({{ dominant_pct|round(1) }}% речень),
+        що може бути пов’язано з акцентом на загрозах, проблемах або критичних оцінках ситуації.
+      </p>
+    {% endif %}
+    <p>
+      У кількісному вимірі: позитивні речення становлять {{ ns.pos }} ({{ p_pos|round(1) }}%),
+      нейтральні — {{ ns.neu }} ({{ p_neu|round(1) }}%),
+      негативні — {{ ns.neg }} ({{ p_neg|round(1) }}%).
+      Таке співвідношення дозволяє зробити узагальнений висновок про емоційний фон промови
+      та використовувати його для порівняння з іншими текстами.
+    </p>
+  {% else %}
+    <p>
+      Тональний аналіз не виконано, оскільки не вдалося виділити жодного речення у тексті.
+    </p>
+  {% endif %}
+</div>

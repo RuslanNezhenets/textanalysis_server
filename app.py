@@ -14,7 +14,8 @@ from services.sentiment_service import analyze_sentiment
 from services.statistics_service import compute_text_stats
 from db.mongo import init_mongo
 
-from routers.workspace_router import router as workspace_router, get_tab_full, apply_tab_patch, get_tab_full_service
+from routers.workspace_router import router as workspace_router, apply_tab_patch, get_tab_full_service
+from routers.report_router import router as report_assets_router
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,6 @@ app.add_middleware(
     allow_methods=["POST", "OPTIONS", "GET", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
-
 
 @app.on_event("startup")
 def init_resources():
@@ -58,7 +58,7 @@ def init_resources():
 
 
 app.include_router(workspace_router)
-
+app.include_router(report_assets_router)
 
 @app.post("/api/stats", response_model=Dict[str, Any])
 def text_stats(req: StatsRequest):

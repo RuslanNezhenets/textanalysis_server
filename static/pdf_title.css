@@ -1,0 +1,52 @@
+/* --- Базовые переменные (можно править под вкус) --- */
+:root{
+  --font-main: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+  --color-text: #1f2937;     /* тёмно-серый, не чисто чёрный */
+  --color-muted: #6b7280;    /* приглушённый серый для даты */
+  --accent: #0ea5e9;         /* мягкий акцент (голубой) */
+}
+
+/* --- Печать/страница --- */
+@page {
+  size: A4;
+  margin: 20mm 15mm 20mm 15mm;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-main);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+}
+
+/* --- Титульная страница --- */
+.title-page {
+  /* для экрана: занять высоту окна, для печати — аккуратно центрироваться в рамках полей */
+  min-height: 100vh;
+  /* если рендер в PDF: высота A4 минус поля @page (297мм − 2*25мм = 247мм) — опционально */
+  height: calc(297mm - 50mm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;   /* идеальное вертикальное центрирование */
+  text-align: center;
+  gap: 8mm;                  /* равномерные промежутки между элементами */
+}
+
+/* Главный заголовок */
+.title-main {
+  font-weight: 800;
+  line-height: 1.15;
+  /* Крупный и благородный размер для титула */
+  font-size: 36pt;           /* ~48px, смотрится хорошо на A4 */
+  letter-spacing: 0.5px;
+  margin: 0;
+  /* Тонкая декоративная линия под заголовком */
+  position: relative;
+  padding-bottom: 6mm;
+}

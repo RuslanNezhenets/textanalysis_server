@@ -1,0 +1,66 @@
+/* Базовая сетка */
+.sent-summary {
+  display: flex; gap: 12px; margin: 12px 0 8px;
+}
+.sent-chip {
+  flex: 1; border: 1px solid #dce0e5; border-radius: 10px; padding: 10px 12px;
+  background: #f9fafb;
+}
+.sent-chip__label { font-size: 11pt; color: #374151; }
+.sent-chip__value { font-size: 18pt; font-weight: 700; color: #111827; line-height: 1.1; }
+.sent-chip__pct   { font-size: 10pt; color: #6b7280; }
+
+/* Цветовые акценты */
+.sent-chip.pos { border-color: #cdeae0; background: #f3fcf8; }
+.sent-chip.neu { border-color: #e1e5eb; background: #fbfbfc; }
+.sent-chip.neg { border-color: #f5c9c9; background: #fff6f6; }
+
+/* Прогресс-бар (стек: pos → neu → neg) */
+.sent-progress {
+  display: flex; height: 10px; margin: 6px 0 18px; border-radius: 6px; overflow: hidden; background: #eef1f5;
+}
+.sent-progress .bar.pos { background: #3fbf8a; }
+.sent-progress .bar.neu { background: #9aa3af; }
+.sent-progress .bar.neg { background: #ef6060; }
+
+/* Список предложений */
+.sent-list { display: grid; gap: 10px; }
+.sent-item {
+  border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; background: #ffffff;
+}
+.sent-item.pos { border-color: #cdeae0; }
+.sent-item.neu { border-color: #e1e5eb; }
+.sent-item.neg { border-color: #f5c9c9; }
+.sent-item.low { opacity: 0.85; }
+
+.sent-item__meta {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 10pt; color: #6b7280;
+}
+.badge {
+  text-transform: uppercase; font-weight: 700; padding: 2px 8px; border-radius: 100px; font-size: 9pt; letter-spacing: .4px;
+  background: #eef2f7; color: #374151;
+}
+.badge.positive { background: #e7fbf2; color: #1f7a57; }
+.badge.neutral  { background: #eef2f7; color: #374151; }
+.badge.negative { background: #ffecec; color: #8d1f1f; }
+
+.score { color: #4b5563; }
+.low-flag { color: #8a6116; background: #fff5da; padding: 2px 6px; border-radius: 6px; }
+
+.sent-item__text {
+  font-size: 12pt; color: #111827; line-height: 1.45; margin-bottom: 6px;
+}
+
+.sent-item__top {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+}
+.tr {
+  border: 1px dashed #e5e7eb; border-radius: 8px; padding: 6px 8px; background: #fafafa; font-size: 10pt;
+  display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center;
+}
+.tr__name { color: #374151; font-weight: 600; }
+.tr__conf { color: #111827; font-weight: 600; }
+.tr__lbl { font-size: 9pt; padding: 2px 6px; border-radius: 6px; }
+.tr__lbl.positive { background: #e7fbf2; color: #1f7a57; }
+.tr__lbl.neutral  { background: #eef2f7; color: #374151; }
+.tr__lbl.negative { background: #ffecec; color: #8d1f1f; }

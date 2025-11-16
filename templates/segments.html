@@ -1,0 +1,166 @@
+{# ---- агрегація тем за головною темою блоку ---- #}
+{% set ns = namespace(by_topic={}, total_blocks=0) %}
+
+{% for b in segments %}
+    {% set ns.total_blocks = ns.total_blocks + 1 %}
+    {% if b.top and b.top[0] %}
+        {% set main = b.top[0] %}
+        {% set key = main.topic or main.name %}
+        {% if key in ns.by_topic %}
+            {% set rec = ns.by_topic[key] %}
+            {% set _ = ns.by_topic.__setitem__(key, {
+                'name': rec.name,
+                'count': rec.count + 1
+            }) %}
+        {% else %}
+            {% set _ = ns.by_topic.__setitem__(key, {
+                'name': main.name,
+                'count': 1
+            }) %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+{% set total = ns.total_blocks %}
+
+{# шукаємо домінуючу тему #}
+{% set dom = namespace(topic=None, name=None, count=0) %}
+{% for code, rec in ns.by_topic.items() %}
+    {% if rec.count > dom.count %}
+        {% set dom.topic = code %}
+        {% set dom.name = rec.name %}
+        {% set dom.count = rec.count %}
+    {% endif %}
+{% endfor %}
+{% set dom_pct = (100.0 * dom.count / total) if total else 0 %}
+
+<div class="section-header">
+    <h1>Семантичні сегменти тексту</h1>
+</div>
+
+<p>
+    На цьому етапі текст поділено на <b>смислові блоки</b>, кожен з яких об’єднує
+    кілька послідовних речень із близькою тематикою. Для кожного блоку визначається
+    <b>основна тема</b> (найвірогідніша категорія) та <b>додаткові пов’язані теми</b>,
+    які відображають змішаність змісту. Такий поділ дозволяє побачити загальну структуру промови:
+    які тематичні блоки присутні, як вони розташовані та які сюжети домінують.
+</p>
+
+<div class="subtitle">
+    Кількість семантичних блоків: {{ total }}
+</div>
+
+{# зведена статистика за темами (по головній темі кожного блоку) #}
+{% if total > 0 %}
+    <div class="summary-row">
+        {% for code, rec in ns.by_topic.items() %}
+            {% set pct = (100.0 * rec.count / total) if total else 0 %}
+            <div class="summary-chip neu">
+                <div class="label">{{ rec.name }}</div>
+                <div class="value">{{ rec.count }}</div>
+                <div class="pct">{{ pct|round(1) }}%</div>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<table class="analysis-table">
+    <thead>
+    <tr>
+        <th class="col-idx">#</th>
+        <th>Діапазон речень</th>
+        <th>Текст блоку</th>
+        <th>Основна тема</th>
+        <th>Top-3 теми блоку</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for b in segments %}
+        {# діапазон речень #}
+        {% set start = b.span_range[0] %}
+        {% set end = b.span_range[1] %}
+        {% if b.top and b.top[0] %}
+            {% set main = b.top[0] %}
+        {% else %}
+            {% set main = None %}
+        {% endif %}
+
+        <tr>
+            <td class="col-idx">{{ b.id }}</td>
+
+            <td>
+                {% if start == end %}
+                    Речення {{ start }}
+                {% else %}
+                    Речення {{ start }}–{{ end }}
+                {% endif %}
+            </td>
+
+            <td>
+                <div class="sent-text">{{ b.text }}</div>
+            </td>
+
+            <td>
+                {% if main %}
+                    <div class="sent-label neu">
+                        {{ main.name }}
+                    </div>
+                    {% if main.conf is not none %}
+                        <div class="sent-score">
+                            {{ (main.conf * 100)|round(1) }}%
+                        </div>
+                    {% endif %}
+                    {% if main.low_conf %}
+                        <div class="sent-low-flag">низька впевненість</div>
+                    {% endif %}
+                {% else %}
+                    <span class="sent-low-flag">тема не визначена</span>
+                {% endif %}
+            </td>
+
+            <td>
+                {% if b.top %}
+                    <div class="top-list">
+                        {% for t in b.top %}
+                            <div class="top-item">
+                                <span class="top-name">{{ t.name }}</span>
+                                <span class="top-conf">
+                                    {% if t.conf is not none %}
+                                        {{ (t.conf * 100)|round(1) }}%
+                                    {% else %}
+                                        –
+                                    {% endif %}
+                                </span>
+<!--                                <span class="top-label neu">{{ t.conf_label }}</span>-->
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div>
+    {% if total > 0 and dom.name %}
+        <p>
+            У цілому структура промови складається з {{ total }} смислових блоків.
+            Найчастіше основною темою блоків виступає
+            <b>«{{ dom.name }}»</b>
+            ({{ dom.count }} блок(и), {{ dom_pct|round(1) }}% від загальної кількості),
+            що вказує на її домінування у змісті даного тексту.
+        </p>
+        <p>
+            Інші теми, представлені в блоках, відображають додаткові сюжетні лінії
+            (соціальну політику, економіку, оборону, дипломатію тощо)
+            й дозволяють побачити, як промова поєднує кілька напрямів у рамках єдиного звернення.
+            Такий поділ на сегменти може бути використаний для подальшого порівняння
+            різних промов між собою за композицією та тематичним наповненням.
+        </p>
+    {% else %}
+        <p>
+            Семантична сегментація не виконана або не вдалося побудувати жодного смислового блоку.
+        </p>
+    {% endif %}
+</div>

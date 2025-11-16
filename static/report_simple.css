@@ -1,0 +1,22 @@
+.section {
+  margin: 0 0 24px 0;
+}
+.section h2 {
+  margin: 8px 0 10px 0;
+}
+.figure {
+  text-align: center;
+  margin: 10px 0 25px;
+}
+.subhead {
+  font-weight: bold;
+  margin-top: 10px;
+}
+.pagebreak { page-break-after: always; }
+
+.tbl { width:100%; border-collapse:collapse; margin:6mm 0; font-size:10.5pt; }
+.tbl th, .tbl td { border:1px solid #d1d5db; padding:4mm 3mm; vertical-align:top; }
+.tbl thead th { background:#f3f4f6; font-weight:600; }
+.tbl tr.hit { background:#fff7ed; }
+.tbl tr.hit td { font-weight:600; }
+code { background:#f9fafb; padding:2px 4px; border-radius:3px; }

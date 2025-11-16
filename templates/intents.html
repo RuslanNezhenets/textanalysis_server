@@ -1,0 +1,161 @@
+{# ---- агрегація інтенцій за головною інтенцією речення ---- #}
+{% set ns = namespace(by_intent={}, total_items=0) %}
+
+{% for s in intents %}
+    {% set ns.total_items = ns.total_items + 1 %}
+    {% if s.top and s.top[0] %}
+        {% set main = s.top[0] %}
+        {% set key = main.intent or main.name %}
+        {% if key in ns.by_intent %}
+            {% set rec = ns.by_intent[key] %}
+            {% set _ = ns.by_intent.__setitem__(key, {
+                'name': rec.name,
+                'count': rec.count + 1
+            }) %}
+        {% else %}
+            {% set _ = ns.by_intent.__setitem__(key, {
+                'name': main.name,
+                'count': 1
+            }) %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+{% set total = ns.total_items %}
+
+{# шукаємо домінуючу інтенцію #}
+{% set dom = namespace(code=None, name=None, count=0) %}
+{% for code, rec in ns.by_intent.items() %}
+    {% if rec.count > dom.count %}
+        {% set dom.code = code %}
+        {% set dom.name = rec.name %}
+        {% set dom.count = rec.count %}
+    {% endif %}
+{% endfor %}
+{% set dom_pct = (100.0 * dom.count / total) if total else 0 %}
+
+<div class="section-header">
+    <h1>Інтенційна структура тексту</h1>
+</div>
+
+<p>
+    На цьому етапі виконується <b>інтенційний аналіз</b>: кожне речення
+    (або короткий фрагмент тексту) відноситься до одного чи кількох типів
+    мовленнєвих актів — <b>інформування</b>, <b>мобілізаційні заклики</b>,
+    <b>подяка</b>, <b>обіцянки</b>, <b>команди</b>, <b>декларації</b> тощо.
+    Для кожної одиниці аналізу визначається <b>основна інтенція</b>
+    (найвірогідніший клас) та <b>додаткові інтенції</b>, що відображають
+    змішаність комунікативних цілей. Такий аналіз дозволяє побачити,
+    <i>що саме робить політик своїм мовленням</i> — інформує, закликає,
+    обіцяє, висловлює емоції чи зміцнює ідентичність.
+</p>
+
+<div class="subtitle">
+    Кількість одиниць аналізу (речень або фрагментів): {{ total }}
+</div>
+
+{# зведена статистика за основною інтенцією #}
+{% if total > 0 %}
+    <div class="summary-row">
+        {% for code, rec in ns.by_intent.items() %}
+            {% set pct = (100.0 * rec.count / total) if total else 0 %}
+            <div class="summary-chip neu">
+                <div class="label">{{ rec.name }}</div>
+                <div class="value">{{ rec.count }}</div>
+                <div class="pct">{{ pct|round(1) }}%</div>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<table class="analysis-table">
+    <thead>
+    <tr>
+        <th class="col-idx">#</th>
+        <th>Текст</th>
+        <th>Основна інтенція</th>
+        <th>Top-3 інтенції (оцінки моделі)</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for s in intents %}
+        {% if s.top and s.top[0] %}
+            {% set main = s.top[0] %}
+        {% else %}
+            {% set main = None %}
+        {% endif %}
+
+        <tr>
+            <td class="col-idx">{{ s.id }}</td>
+
+            <td>
+                <div class="sent-text">{{ s.text }}</div>
+            </td>
+
+            <td>
+                {% if main %}
+                    <div class="sent-label neu">
+                        {{ main.name }}
+                    </div>
+                    {% if main.conf is not none %}
+                        <div class="sent-score">
+                            {{ (main.conf * 100)|round(1) }}%
+                        </div>
+                    {% endif %}
+                    {% if main.low_conf %}
+                        <div class="sent-low-flag">низька впевненість</div>
+                    {% endif %}
+                {% else %}
+                    <span class="sent-low-flag">інтенція не визначена</span>
+                {% endif %}
+            </td>
+
+            <td>
+                {% if s.top %}
+                    <div class="top-list">
+                        {% for t in s.top %}
+                            <div class="top-item">
+                                <span class="top-name">{{ t.name }}</span>
+                                <span class="top-conf">
+                                    {% if t.conf is not none %}
+                                        {{ (t.conf * 100)|round(1) }}%
+                                    {% else %}
+                                        –
+                                    {% endif %}
+                                </span>
+                                <span class="top-label neu">{{ t.conf_label }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div>
+  {% if total > 0 and dom.name %}
+    <p>
+        У цілому текст демонструє чітко окреслений
+        <b>інтенційний профіль</b>. Найчастіше як основна інтенція
+        виступає тип <b>«{{ dom.name }}»</b>
+        ({{ dom.count }} одиниць, {{ dom_pct|round(1) }}% від загальної кількості),
+        що свідчить про домінування саме такого способу мовленнєвого впливу
+        у даному зверненні.
+    </p>
+    <p>
+        Інші інтенційні типи — від закликів і обіцянок до вираження емоцій
+        та ритуальних формул — формують другий рівень структури:
+        вони доповнюють домінуючий тип, конкретизують повідомлення,
+        посилюють мобілізаційні або емоційні акценти.
+        Отриманий розподіл можна використовувати для порівняння промов між собою
+        (наприклад, як змінюється частка мобілізаційних закликів чи декларацій
+        у різні періоди).
+    </p>
+  {% else %}
+    <p>
+        Інтенційний аналіз не виконано або не вдалося класифікувати жодної одиниці тексту.
+    </p>
+  {% endif %}
+</div>

@@ -1,0 +1,181 @@
+/* Контейнер секции */
+.section-header {
+    margin: 0 0 10px;
+}
+
+.section-header h1 {
+    font-size: 18pt;
+    margin: 0 0 4px;
+}
+
+.section-header .subtitle {
+    font-size: 10pt;
+    color: #6b7280;
+}
+
+/* Сводка по классам */
+.summary-row {
+    display: flex;
+    gap: 10px;
+    margin: 8px 0 10px;
+}
+
+.summary-chip {
+    flex: 1;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 10pt;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+
+.summary-chip .label {
+    font-weight: 600;
+    color: #374151;
+}
+
+.summary-chip .value {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #111827;
+}
+
+.summary-chip .pct {
+    font-size: 9pt;
+    color: #6b7280;
+}
+
+/* Цвета под тональности, можно переиспользовать */
+.summary-chip.pos {
+    border-color: #cdeae0;
+    background: #f2fbf7;
+}
+
+.summary-chip.neu {
+    border-color: #dce1ea;
+    background: #f5f7fb;
+}
+
+.summary-chip.neg {
+    border-color: #f4c8c8;
+    background: #fff6f6;
+}
+
+/* Таблица */
+.analysis-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+}
+
+.analysis-table th,
+.analysis-table td {
+    border: 1px solid #e5e7eb;
+    padding: 4px 6px;
+    vertical-align: top;
+}
+
+.analysis-table thead th {
+    background: #f3f4f6;
+    font-weight: 600;
+    color: #374151;
+    text-align: left;
+}
+
+/* Узкая колонка с индексом */
+.analysis-table .col-idx {
+    width: 22px;
+    text-align: right;
+    color: #6b7280;
+}
+
+/* Лейблы тональности */
+.sent-label {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 9pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.sent-label.pos {
+    background: #e7fbf2;
+    color: #1f7a57;
+}
+
+.sent-label.neu {
+    background: #eef2f7;
+    color: #374151;
+}
+
+.sent-label.neg {
+    background: #ffecec;
+    color: #8d1f1f;
+}
+
+.sent-score {
+    font-size: 9pt;
+    color: #4b5563;
+}
+
+.sent-low-flag {
+    font-size: 9pt;
+    color: #8a6116;
+    background: #fff5da;
+    padding: 1px 4px;
+    border-radius: 4px;
+}
+
+/* Текст предложения */
+.sent-text {
+    font-size: 11pt;
+    color: #111827;
+}
+
+/* Топ-3 внутри ячейки */
+.top-list {
+    display: grid;
+    gap: 2px;
+}
+
+.top-item {
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr auto;
+    gap: 4px;
+    font-size: 9pt;
+}
+
+.top-name {
+    color: #374151;
+}
+
+.top-conf {
+    font-weight: 600;
+    color: #111827;
+}
+
+.top-label {
+    padding: 5px;
+    border-radius: 6px;
+    font-size: 8.5pt;
+    min-width: 40px;
+    text-align: center;
+    vertical-align: center;
+}
+
+.top-label.pos {
+    background: #e7fbf2;
+    color: #1f7a57;
+}
+
+.top-label.neu {
+    background: #eef2f7;
+    color: #374151;
+}
+
+.top-label.neg {
+    background: #ffecec;
+    color: #8d1f1f;
+}
