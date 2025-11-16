@@ -1,14 +1,14 @@
 import re
+import spacy
+
 from collections import Counter
 from functools import lru_cache
 from typing import Dict, Any, List, Tuple
 
-import spacy
+from services.text_preprocessing_service import get_paragraphs_by_text, get_documents_by_text, get_sentences_by_text
 
-def _clamp01(x: float) -> float:
-    return max(0.0, min(1.0, float(x)))
 
-UA_VOWELS = set("аеєиіїоуюяАЕЄИІЇОУЮЯ")  # регистр не важен; латиница вдруг попадётся
+UA_VOWELS = set("аеєиіїоуюяАЕЄИІЇОУЮЯ")
 APOS = {"'", "’", "ʼ", "`", "´", "ʻ"}
 
 def count_syllables_uk(word: str) -> int:
@@ -42,6 +42,9 @@ def _perception_ua(readability_0_100: float, content_ratio_0_1: float) -> float:
     Комбінований індекс сприйняття (0..100):
       60% читабельність + 40% лексична щільність (змістовні слова).
     """
+    def _clamp01(x: float) -> float:
+        return max(0.0, min(1.0, float(x)))
+
     r = _clamp01(readability_0_100 / 100.0)
     c = _clamp01(content_ratio_0_1)
     p = 0.6 * r + 0.4 * c
@@ -62,16 +65,8 @@ def _perception_level_ua(p: float) -> str:
         return "Складний"
     return "Дуже складний"
 
-# --- сервис: лениво грузим spaCy-модель один раз ---
-@lru_cache(maxsize=1)
-def _get_nlp(model_name: str = "uk_core_news_sm"):
-    return spacy.load(model_name)
-
-
 def compute_text_stats(
     text: str,
-    *,
-    spacy_model: str = "uk_core_news_sm",
     top_n_words: int = 10,
     top_n_bigrams: int = 10
 ) -> Dict[str, Any]:
@@ -84,64 +79,21 @@ def compute_text_stats(
     - топ-N слов и биграмм (по леммам, без стоп-слов).
     """
 
-    # --- предобработка ---
-    text = text or ""
     # абзацы считаем по пустым строкам / переводам
-    paragraphs = [p for p in re.split(r"\n\s*\n+", text.strip()) if p.strip()]
+    paragraphs = get_paragraphs_by_text(text)
     paragraphs_count = len(paragraphs)
 
     # нормализуем подряд идущие пробелы
-    cleaned_text = re.sub(r"\s+", " ", text.strip())
     chars_with_spaces = len(text)
     chars_no_spaces = len(re.sub(r"\s+", "", text))
 
-    if not cleaned_text:
-        return {
-            "basic": {
-                "chars_with_spaces": chars_with_spaces,
-                "chars_no_spaces": chars_no_spaces,
-                "words": 0,
-                "unique_words": 0,
-                "sentences": 0,
-                "paragraphs": paragraphs_count,
-            },
-            "averages": {
-                "avg_word_length_chars": 0.0,
-                "avg_sentence_length_words": 0.0,
-                "max_word_length_chars": 0,
-                "avg_sentences_per_paragraph": 0.0,
-            },
-            "vocabulary": {
-                "lexical_diversity_ratio": 0.0,
-                "hapax_count": 0,
-            },
-            "lexical_density": {
-                "content_words_ratio": 0.0,
-                "function_words_ratio": 0.0,
-                "pos_distribution": {},
-            },
-            "frequency": {
-                "top_words": [],
-                "top_bigrams": [],
-            },
-            "readability": {
-                "ua_index": 0,
-                "level": '',
-            },
-            "perception": {
-                "ua_index": 0
-            },
-        }
-
-    nlp = _get_nlp(spacy_model)
-    doc = nlp(cleaned_text)
-
     # --- предложения ---
-    sentences: List[str] = [s.text.strip() for s in doc.sents if s.text.strip()]
+    sentences = get_sentences_by_text(text)
     sentences_count = len(sentences)
 
     # --- токены (слова) ---
     # "все слова" = токены-алфавитные, без цифр и пунктуации (для средних длин и читабельных метрик)
+    doc = get_documents_by_text(text)
     all_word_tokens = [t for t in doc if t.is_alpha]
     all_words_lemmas = [t.lemma_.lower() for t in all_word_tokens]
 
@@ -257,11 +209,3 @@ def compute_text_stats(
             "level": ua_perception_level,
         },
     }
-
-
-# --- пример использования ---
-if __name__ == "__main__":
-    sample = "Бажаю здоровʼя, шановні українці, українки!\n\nСьогодні Донеччина: Краматорськ, Словʼянськ, наші бойові бригади – спілкування з нашими воїнами. Я відзначив державними нагородами – саме за успіхи в боях – найкращих наших воїнів, тих, хто проявив себе найбільше цими тижнями. Ми здійснюємо зараз одну з наших контрнаступальних операцій – хлопці молодці – на Донецькому напрямку, у районі Покровська, у районі Добропілля. Жорсткі бої, але вдалося завдати росіянам відчутних втрат. Фактично наші сили позбавляють окупанта можливості здійснити на цьому напрямку наступальну повноцінну операцію, яку вони планували довго й на яку розраховували. Спочатку Сумщина була у них, тепер тут українські підрозділи досягають результату для України. Я дякую всім, хто задіяний. Операція триває – так, як ми визначали. Важливий успіх України. Дякую ДШВ, штурмовим полкам і батальйонам, усім нашим піхотинцям, розвідникам, артилеристам, підрозділам Національної гвардії. Дякую кожному, хто забезпечує безпілотну складову.\n\nБула сьогодні перша доповідь Головкома Сирського щодо результатів. За час від початку операції наші воїни вже звільнили 160 квадратних кілометрів, ще більш ніж 170 квадратних кілометрів очищені від окупанта. Суттєво поповнили наш обмінний фонд – майже сотня вже є російських полонених, будуть ще. Вже сім населених пунктів на напрямку звільнені, ще дев'ять очищені від російської присутності. Будь-яку групу окупантів, які намагаються сюди заходити, знищують наші хлопці. Втрати росіян тільки від початку цієї нашої контрнаступальної операції, тільки в районі Покровська, тільки цими тижнями вже більш ніж дві з половиною тисячі, з них більш ніж 1300 росіян убито.\n\nУкраїна цілком справедливо захищає свої позиції, захищає свою землю. І це героїчний захист. Я пишаюсь нашими воїнами, пишаюсь нашими людьми. Україна в цій війні знаходить захист від кожної російської підлості. Ми зриваємо всі російські плани – плани знищення нашої держави. Наша оборона завжди активна. І ми довели, що українці можуть досягати необхідних результатів, навіть тоді досягати, коли багато хто у світі очікує результатів від Росії. Важливо, щоб і партнери діяли достойно – саме так, як наші люди заслуговують на підтримку. Росію треба змусити до миру. І це може зробити Україна за наявності достатньої сили в нашої армії, достатньої далекобійності. І це може зробити світ разом, разом із нами, безумовно, – сильними санкціями проти Росії, сильним тиском, таким же сильним, які сильні наші люди. Я хочу подякувати кожному, хто бʼється заради України!\n\nСлава Україні!"
-    stats = compute_text_stats(sample)
-    import json
-    print(json.dumps(stats, ensure_ascii=False, indent=2))

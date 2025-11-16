@@ -1,8 +1,6 @@
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-import spacy
-import re
 from sentence_transformers import SentenceTransformer
 
 from nlpclf.topics_agg import aggregate_block_topics_with_override
@@ -12,6 +10,7 @@ from nlpclf.segmentation.pipeline import text_division
 
 
 from models.models import TopicHit, SegmentationRequest, SentenceResult, ClassifyResponse
+from services.text_preprocessing_service import get_sentences_by_text
 
 
 class TopicsClassifier(BaseCompatClassifier):
@@ -79,33 +78,15 @@ def build_topics_classifier(
     templates = load_templates(templates_path)
     return TopicsClassifier(templates, config_path=config_path, cfg=cfg, model=model)
 
-def _split_sentences(text: str, nlp: Optional[spacy.language.Language]) -> List[str]:
-    """
-    Розбиває текст на речення за spaCy (якщо надано), або простим правилом.
-
-    Args:
-        text (str): Вхідний текст.
-        nlp (spacy.language.Language | None): Пайплайн spaCy або None.
-
-    Returns:
-        List[str]: Список речень без порожніх рядків.
-    """
-    if nlp is None:
-        return [s.strip() for s in re.split(r'(?<=[\.\!\?…])\s+', text or "") if s.strip()]
-    doc = nlp(text or "")
-    return [s.text.strip() for s in doc.sents if s.text.strip()]
-
-
 def topics_definition(
     req: SegmentationRequest,
-    nlp: Optional[spacy.language.Language] = None,
     clf: Any = None,
     st_model: Optional[SentenceTransformer] = None
 ):
     t0 = __import__("time").perf_counter()
 
     cfg = (getattr(clf, "config", {}) or {}).get("segmentation", {})
-    doc = text_division(req, nlp=nlp, st_model=st_model, cfg=cfg)
+    doc = text_division(req, st_model=st_model, cfg=cfg)
     if not getattr(doc, "blocks", None):
         return doc
 
@@ -116,16 +97,13 @@ def topics_definition(
 
     results: List[SentenceResult] = []
 
-    def _split_sentences(text: str) -> List[str]:
-        return [s.strip() for s in re.split(r'(?<=[\.\!\?…])\s+', text or "") if s.strip()]
-
     for idx, blk in enumerate(doc.blocks):
         block_text = blk.text
         if hasattr(blk, "sentences") and blk.sentences:
             sentences = [s if isinstance(s, str) else getattr(s, "text", "") for s in blk.sentences]
             sentences = [s for s in sentences if s]
         else:
-            sentences = _split_sentences(block_text)
+            sentences = get_sentences_by_text(block_text)
 
         per_sent_hits: List[List[Dict[str, Any]]] = []
         if sentences:

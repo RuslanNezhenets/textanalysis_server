@@ -50,7 +50,6 @@ class SegmentationRequest(BaseModel):
     model_name: str = Field("paraphrase-xlm-r-multilingual-v1", description="Назва SentenceTransformer-моделі")
     smoothing: SmoothingConfig = Field(default_factory=SmoothingConfig, description="Конфіг згладжування коротких речень")
     top_k: int = Field(3, ge=1, le=12)
-    debug: bool = Field(False, description="Повернути діагностику обчислень")
 
 
 class SegmentationResponse(BaseModel):
@@ -135,8 +134,6 @@ class ClassifyResponse(BaseModel):
     """Вихід з /intent — список речень і топ-k гіпотез по кожному."""
     results: List[SentenceResult]
     metrics: Dict[str, Any]
-
-
 
 class StatsRequest(BaseModel):
     text: constr(strip_whitespace=True, min_length=2) = Field(..., description="Сырой текст")

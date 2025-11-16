@@ -1,6 +1,7 @@
-# sentiment_service.py  — простая версия без типов/датаклассов
 from transformers import pipeline
-import spacy, re
+import spacy
+
+from services.text_preprocessing_service import get_sentences_by_text
 
 # --------- Модель и токенайзер ---------
 clf = pipeline(
@@ -10,8 +11,6 @@ clf = pipeline(
     truncation=True,
     max_length=512
 )
-
-nlp = spacy.load("uk_core_news_sm")
 
 SENTIMENT_DESCRIPTIONS = {
     "positive": "Позитивна тональність",
@@ -25,17 +24,6 @@ def conf_label_from_score(c: float) -> str:
     if c >= 0.45:
         return "Medium"
     return "Low"
-
-# --------- Нормализация и чанкинг ---------
-APOSTROPHES = ["’", "ʼ", "`", "´", "ʻ"]
-
-def normalize_text(s):
-    s = s.replace("\r", " ")
-    for a in APOSTROPHES:
-        s = s.replace(a, "'")
-    s = re.sub(r"\s+", " ", s).strip()
-    s = re.sub(r"https?://\S+|www\.\S+", "", s)
-    return s
 
 def chunk_text_by_chars(text, max_len=450):
     if len(text) <= max_len:
@@ -54,11 +42,7 @@ def chunk_text_by_chars(text, max_len=450):
 # --------- Ядро ---------
 def _sentiment_by_sentences_core(text, batch_size=32):
     """Возвращает список словарей с avg_scores по каждому предложению."""
-    text = normalize_text(text)
-    doc = nlp(text)
-    sents = [s.text.strip() for s in doc.sents if s.text.strip()]
-    if not sents:
-        return []
+    sents = get_sentences_by_text(text)
 
     prepared, backmap = [], []
     for i, s in enumerate(sents):

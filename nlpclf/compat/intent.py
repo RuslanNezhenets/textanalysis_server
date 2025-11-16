@@ -1,11 +1,14 @@
 from typing import Any, List, Optional, Dict
 
 import numpy as np
+import time, re
 
 from nlpclf.compat.base_compat import BaseCompatClassifier
 from nlpclf.compat.common import load_templates, labels_with_margin
 
 from models.models import IntentHit, ClassifyRequest, ClassifyResponse, SentenceResult
+from services.text_preprocessing_service import get_sentences_by_text
+
 
 class IntentClassifier(BaseCompatClassifier):
     """
@@ -87,11 +90,9 @@ def intent_analysis(req: ClassifyRequest, clf: Any) -> ClassifyResponse:
     Returns:
         ClassifyResponse: список предложений с top-интентами и метриками.
     """
-    import time, re
     t0 = time.perf_counter()
 
-    text = re.sub(r"\s+", " ", (req.text or "").strip())
-    sentences = [p for p in re.split(r"(?<=[.!?])\s+", text) if p]  # простое разбиение — как в источнике
+    sentences = get_sentences_by_text(req.text)
 
     raw_hits = clf.classify_sentences(sentences)
 

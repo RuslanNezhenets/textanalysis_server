@@ -3,7 +3,6 @@ from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import spacy
 from sentence_transformers import SentenceTransformer
 
 from models.models import ClassifyResponse, SegmentationRequest, ClassifyRequest, StatsRequest, SentimentResponse, \
@@ -16,6 +15,12 @@ from db.mongo import init_mongo
 
 from routers.workspace_router import router as workspace_router, apply_tab_patch, get_tab_full_service
 from routers.report_router import router as report_assets_router
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +37,6 @@ app.add_middleware(
 @app.on_event("startup")
 def init_resources():
     try:
-        logger.info("Загрузка spaCy...")
-        app.state.nlp = spacy.load("uk_core_news_sm")
-
         logger.info("Загрузка sentence-transformers модели...")
         st_model = SentenceTransformer("paraphrase-xlm-r-multilingual-v1")
         app.state.st_model = st_model
@@ -56,7 +58,6 @@ def init_resources():
         logger.exception("Ошибка инициализации моделей")
         raise
 
-
 app.include_router(workspace_router)
 app.include_router(report_assets_router)
 
@@ -72,7 +73,6 @@ def text_stats(req: StatsRequest):
     try:
         stats = compute_text_stats(
             req.text,
-            spacy_model=req.spacy_model or "uk_core_news_sm",
             top_n_words=req.top_n_words,
             top_n_bigrams=req.top_n_bigrams
         )
@@ -104,7 +104,6 @@ def text_stats(req: StatsRequest):
         return stats
     except Exception as e:
         raise HTTPException(500, f"Ошибка выполнения /stats: {e}")
-
 
 @app.post("/api/sentiment", response_model=SentimentResponse)
 def text_sentiment(req: SentimentRequest):
@@ -139,7 +138,6 @@ def text_sentiment(req: SentimentRequest):
 
     return sentiment
 
-
 @app.post("/api/segment", response_model=ClassifyResponse, response_model_exclude_none=True)
 def segment_text(req: SegmentationRequest):
     """
@@ -149,7 +147,7 @@ def segment_text(req: SegmentationRequest):
     if not req.text or len(req.text.strip()) < 5:
         raise HTTPException(400, "Пустой или слишком короткий текст")
     try:
-        segment = topics_definition(req, nlp=app.state.nlp, clf=app.state.topic_clf, st_model=app.state.st_model)
+        segment = topics_definition(req, clf=app.state.topic_clf, st_model=app.state.st_model)
 
         coll = app.state.workspace_coll
         tab_doc = get_tab_full_service(coll, req.tab_id)
@@ -179,7 +177,6 @@ def segment_text(req: SegmentationRequest):
         return segment
     except Exception as e:
         raise HTTPException(500, f"Ошибка выполнения /segment: {e}")
-
 
 @app.post("/api/intent", response_model=ClassifyResponse, response_model_exclude_none=True)
 def classify_intents(req: ClassifyRequest):

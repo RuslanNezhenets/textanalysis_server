@@ -1,27 +1,15 @@
 import hashlib, time
 from typing import List, Dict, Any, Optional
 
-import spacy
 from sentence_transformers import SentenceTransformer
 
 from nlpclf.segmentation.core import segment_text, spans_from_breakpoints
 from models.models import SegmentationRequest, SegmentationResponse, SegmentBlock
-
-
-def _load_paragraphs(text: str) -> List[str]:
-    """Розбиває текст на абзаци по подвійних перенесеннях."""
-    return [p.strip() for p in (text or "").split("\n\n") if p.strip()]
-
-
-def _split_sentences(paragraph: str, nlp) -> List[str]:
-    """Розбиває абзац на речення за допомогою spaCy."""
-    doc = nlp(paragraph)
-    return [s.text.strip() for s in doc.sents if len(s.text.strip()) >= 2]
+from services.text_preprocessing_service import get_paragraphs_by_text, get_sentences_by_text
 
 
 def text_division(
     req: SegmentationRequest,
-    nlp: Optional[spacy.language.Language] = None,
     st_model: Optional[SentenceTransformer] = None,
     cfg: Optional[Dict[str, Any]] = None,
 ) -> SegmentationResponse:
@@ -30,8 +18,7 @@ def text_division(
 
     Args:
         req (SegmentationRequest): Вхідні параметри (текст, model_name, window_size, smoothing).
-        nlp (spacy.language.Language | None): Пайплайн spaCy для розбивки на речення.
-        st_model (SentenceTransformer | None): Готова модель (опц.), якщо збігається з req.model_name.
+        st_model (SentenceTransformer | None): Готова модель SentenceTransformer
         cfg (dict | None): Конфіг сегментації (перекриває дефолти/поля req):
             {
               "similarity_window": int,
@@ -49,14 +36,6 @@ def text_division(
     """
     t0 = time.perf_counter()
 
-    # 1) NLP / модель
-    nlp = nlp or spacy.load("uk_core_news_sm")
-    model = (
-        st_model
-        if (st_model and req.model_name == "paraphrase-xlm-r-multilingual-v1")
-        else SentenceTransformer(req.model_name)
-    )
-
     def _coalesce(*vals):
         """Вернёт первый из vals, который не None."""
         for v in vals:
@@ -64,39 +43,27 @@ def text_division(
                 return v
         return None
 
-    # 2) Збір конфігу (req → cfg)
     cfg = cfg or {}
     sm_cfg = cfg.get("smoothing", {}) or {}
 
-    seg_win = int(max(1, _coalesce(getattr(req, "window_size", None),
-                                   cfg.get("similarity_window"),
-                                   3)))
+    seg_win = int(max(1, _coalesce(getattr(req, "window_size", None), cfg.get("similarity_window"), 3)))
 
     req_sm = getattr(req, "smoothing", None)
     req_sm_enabled = getattr(req_sm, "enabled", None) if req_sm is not None else None
-    smoothing_enabled = bool(_coalesce(req_sm_enabled,
-                                       sm_cfg.get("enabled"),
-                                       True))
+    smoothing_enabled = bool(_coalesce(req_sm_enabled, sm_cfg.get("enabled"), True))
 
     req_min_len = getattr(req_sm, "min_length", None) if req_sm is not None else None
-    short_len = int(max(1, _coalesce(req_min_len,
-                                     sm_cfg.get("max_words"),
-                                     5)))
+    short_len = int(max(1, _coalesce(req_min_len, sm_cfg.get("max_words"), 5)))
 
     cut_policy = str(cfg.get("cut_policy", "before_right"))
     bp_cfg = cfg.get("breakpoints", {}) or {}
 
-    # 3) Розбивка на абзаци/речення
-    paragraphs = _load_paragraphs(req.text)
+    paragraphs = get_paragraphs_by_text(req.text)
     all_blocks: List[SegmentBlock] = []
-    debug_info: Optional[Dict[str, Any]] = {} if req.debug else None
+
     total_sentences = 0
-
     for pi, paragraph in enumerate(paragraphs):
-        sents = _split_sentences(paragraph, nlp)
-
-        if debug_info is not None:
-            debug_info.setdefault("paragraphs", []).append({"index": pi + 1, "sentences": sents})
+        sents = get_sentences_by_text(paragraph)
 
         if len(sents) <= seg_win:
             start = total_sentences
@@ -106,7 +73,7 @@ def text_division(
             continue
 
         # 4) Ембеддинги й сегментація
-        embeddings = model.encode(sents, convert_to_numpy=True)
+        embeddings = st_model.encode(sents, convert_to_numpy=True)
         blocks_text, spans = segment_text(
             sents, embeddings,
             window_size=seg_win,
@@ -128,8 +95,6 @@ def text_division(
             ))
 
         total_sentences += len(sents)
-        if debug_info is not None:
-            debug_info["paragraphs"][-1]["spans_local"] = spans
 
     # 5) Метрики/параметри без тексту
     text_hash = hashlib.sha1((req.text or "").encode("utf-8")).hexdigest()[:10]
@@ -147,4 +112,4 @@ def text_division(
         "n_sentences_total": total_sentences,
     }
 
-    return SegmentationResponse(params=safe_params, blocks=all_blocks, metrics=metrics, debug=debug_info)
+    return SegmentationResponse(params=safe_params, blocks=all_blocks, metrics=metrics)
