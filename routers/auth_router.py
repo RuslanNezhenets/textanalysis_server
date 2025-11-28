@@ -13,7 +13,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 class RegisterBody(BaseModel):
     email: EmailStr
     password: str
-    full_name: Optional[str] = None
+    name: Optional[str] = None
 
 class LoginBody(BaseModel):
     email: EmailStr
@@ -54,7 +54,6 @@ def login(body: LoginBody, response: Response,
         "created_at": datetime.utcnow(),
         "expires_at": exp
     })
-    # два варианта: вернуть токен и/или положить httpOnly-cookie
     response.set_cookie(
         key="auth_token", value=tok, httponly=True, secure=False, samesite="lax", max_age=7*24*3600
     )
@@ -70,7 +69,7 @@ def logout(request: Request, tokens: Collection = Depends(_tokens)):
 
 def _extract_token_from_request(request: Request) -> str | None:
     """
-    Пытаемся вытащить токен из:
+    Намагаємось витягнути токен з:
     - заголовка Authorization: Bearer <token>
     - заголовка X-Auth-Token
     - cookie auth_token
@@ -100,8 +99,8 @@ def get_current_user(
     tokens: Collection = Depends(_tokens),
 ) -> dict:
     """
-    Достаёт пользователя по токену.
-    Если токен невалиден/не найден/просрочен — кидает 401.
+    Дістає користувача за токеном.
+    Якщо токен невалідний / не знайдений / прострочений - кидає 401.
     """
     tok = _extract_token_from_request(request)
     if not tok:
@@ -124,10 +123,10 @@ def get_current_user(
 @router.get("/check")
 def auth_check(current = Depends(get_current_user)):
     """
-    Проверка авторизации.
-    Клиент отправляет Bearer-токен (или cookie), сервер:
-    - если ок — возвращает данные пользователя и ok: true
-    - если нет — 401 из get_current_user
+    Перевірка авторизації.
+    Клієнт відправляє Bearer-токен (або cookie), сервер:
+    - якщо ок - повертає дані користувача та ok: true
+    - якщо ні - 401 з get_current_user
     """
     return {
         "ok": True,

@@ -1,13 +1,11 @@
 from transformers import pipeline
-import spacy
 
 from services.text_preprocessing_service import get_sentences_by_text
 
-# --------- Модель и токенайзер ---------
 clf = pipeline(
     "sentiment-analysis",
     model="cardiffnlp/twitter-xlm-roberta-base-sentiment",
-    top_k=None,          # вернуть распределение по всем классам
+    top_k=None,
     truncation=True,
     max_length=512
 )
@@ -41,7 +39,7 @@ def chunk_text_by_chars(text, max_len=450):
 
 # --------- Ядро ---------
 def _sentiment_by_sentences_core(text, batch_size=32):
-    """Возвращает список словарей с avg_scores по каждому предложению."""
+    """Повертає список словників з avg_scores за кожною пропозицією."""
     sents = get_sentences_by_text(text)
 
     prepared, backmap = [], []
@@ -52,9 +50,8 @@ def _sentiment_by_sentences_core(text, batch_size=32):
 
     raw_preds = []
     for i in range(0, len(prepared), batch_size):
-        raw_preds.extend(clf(prepared[i:i+batch_size]))  # top_k=None -> список распределений
+        raw_preds.extend(clf(prepared[i:i+batch_size]))
 
-    # агрегируем чанки → предложение
     per_sentence = [{"text": s, "scores": {"positive": 0.0, "neutral": 0.0, "negative": 0.0}, "count": 0}
                     for s in sents]
     for pred_list, sent_idx in zip(raw_preds, backmap):
@@ -69,7 +66,6 @@ def _sentiment_by_sentences_core(text, batch_size=32):
     for i, entry in enumerate(per_sentence):
         cnt = max(1, entry["count"])
         avg_scores = {k: v / cnt for k, v in entry["scores"].items()}
-        # лучшая метка и уверенность
         best_label, best_score = max(avg_scores.items(), key=lambda x: x[1])
         low_conf = best_score < 0.55
         results.append({
@@ -83,7 +79,7 @@ def _sentiment_by_sentences_core(text, batch_size=32):
     return results
 
 def _summarize_document(sentence_results):
-    """Сводка по документу из распределений предложений."""
+    """Зведення по документу із розподілів пропозицій."""
     n = max(1, len(sentence_results))
     totals = {"positive": 0.0, "neutral": 0.0, "negative": 0.0}
     for r in sentence_results:
@@ -102,18 +98,7 @@ def _summarize_document(sentence_results):
         }
     }
 
-# --------- Публичная функция для эндпоинта ---------
 def analyze_sentiment(text, include_raw=False, low_conf_threshold=0.55):
-    """
-    Возвращает:
-    {
-      "summary": { label, score, avg: {...}, counts: {...} },
-      "sentences": [
-        { idx, text, label, score, low_conf, top? }
-      ]
-    }
-    Где top — массив [{name, conf}], если include_raw=True.
-    """
     raw = _sentiment_by_sentences_core(text)
     if low_conf_threshold != 0.55:
         for r in raw:
@@ -134,9 +119,9 @@ def analyze_sentiment(text, include_raw=False, low_conf_threshold=0.55):
             [
                 {
                     "sentiment": k,
-                    "name": SENTIMENT_DESCRIPTIONS.get(k, k),  # <-- описание
+                    "name": SENTIMENT_DESCRIPTIONS.get(k, k),
                     "conf": float(v),
-                    "conf_label": conf_label_from_score(float(v)),  # опционально, для бейджа в UI
+                    "conf_label": conf_label_from_score(float(v)),
                 }
                 for k, v in s.items()
             ],

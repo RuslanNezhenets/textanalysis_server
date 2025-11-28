@@ -31,8 +31,8 @@ def verify_password(password: str, stored: str) -> bool:
 
 def token_pair(user_id: str, ttl_minutes: int = 7 * 24 * 60) -> Tuple[str, datetime]:
     """
-    Генерирует случайный токен и срок действия (по умолчанию 7 дней).
-    Токен хранится на сервере, клиент получает только opaque-строку.
+    Генерує випадковий токен та термін дії (за умовчанням 7 днів).
+    Токен зберігається на сервері, клієнт отримує тільки opaque-рядок.
     """
     tok = base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip("=")
     exp = datetime.utcnow() + timedelta(minutes=ttl_minutes)

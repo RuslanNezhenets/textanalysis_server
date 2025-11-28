@@ -1,4 +1,3 @@
-/* Контейнер секции */
 .section-header {
     margin: 0 0 10px;
 }
@@ -13,7 +12,6 @@
     color: #6b7280;
 }
 
-/* Сводка по классам */
 .summary-row {
     display: flex;
     gap: 10px;
@@ -45,7 +43,6 @@
     color: #6b7280;
 }
 
-/* Цвета под тональности, можно переиспользовать */
 .summary-chip.pos {
     border-color: #cdeae0;
     background: #f2fbf7;
@@ -61,7 +58,6 @@
     background: #fff6f6;
 }
 
-/* Таблица */
 .analysis-table {
     width: 100%;
     border-collapse: collapse;
@@ -82,14 +78,12 @@
     text-align: left;
 }
 
-/* Узкая колонка с индексом */
 .analysis-table .col-idx {
     width: 22px;
     text-align: right;
     color: #6b7280;
 }
 
-/* Лейблы тональности */
 .sent-label {
     display: inline-block;
     padding: 1px 6px;
@@ -128,13 +122,11 @@
     border-radius: 4px;
 }
 
-/* Текст предложения */
 .sent-text {
     font-size: 11pt;
     color: #111827;
 }
 
-/* Топ-3 внутри ячейки */
 .top-list {
     display: grid;
     gap: 2px;

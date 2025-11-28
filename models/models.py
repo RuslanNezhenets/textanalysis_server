@@ -3,12 +3,10 @@ from pydantic import BaseModel, Field, constr, conint
 from pydantic import ConfigDict
 
 __all__ = [
-    # Сегментация
     "SmoothingConfig",
     "SegmentationRequest",
     "SegmentationResponse",
     "SegmentBlock",
-    # Інтент-аналіз
     "IntentHit",
     "TopicHit",
     "ClassifyRequest",
@@ -69,7 +67,6 @@ class _BaseLabelHit(BaseModel):
     low_conf: bool = Field(False, description="Позначка низької впевненості")
     conf_label: Optional[str] = Field(None, description="High / Medium / Low")
 
-    # диагностические (используйте только при debug)
     score: Optional[float] = Field(default=None, description="Логарифм ймовірності")
     sim: Optional[float] = Field(default=None, description="Гібридний показник схожості")
     lex: Optional[float] = Field(default=None, description="Лексичний бонус")
@@ -82,7 +79,6 @@ class _BaseLabelHit(BaseModel):
 
 
 class IntentHit(_BaseLabelHit):
-    # хотим сериализовать поле key под именем "intent"
     intent: Optional[str] = Field(
         default=None,
         validation_alias="key",
@@ -92,7 +88,6 @@ class IntentHit(_BaseLabelHit):
 
 
 class TopicHit(_BaseLabelHit):
-    # хотим сериализовать поле key под именем "topic"
     topic: Optional[str] = Field(
         default=None,
         validation_alias="key",
@@ -110,7 +105,6 @@ class ClassifyRequest(BaseModel):
         description="SentenceTransformer-модель для класифікації"
     )
 
-    # Параметри класифікатора (опційні, із дефолтами)
     use_mahalanobis: bool = True
     mahalanobis_reg: float = 0.10
     T_maha: float = 0.75

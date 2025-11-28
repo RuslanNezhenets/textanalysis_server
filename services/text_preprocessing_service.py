@@ -14,11 +14,8 @@ def normalize_soft(s: str) -> str:
     for a in APOSTROPHES:
         s = s.replace(a, "'")
     s = s.replace("\u00A0", " ").replace("\u200B", "")
-    # удаляем URL
     s = re.sub(r"https?://\S+|www\.\S+", "", s)
-    # схлопываем только пробелы, но не \n
     s = re.sub(r"[ \t]+", " ", s)
-    # убираем пробелы в начале/конце строк
     s = "\n".join(line.strip() for line in s.splitlines())
     return s.strip()
 

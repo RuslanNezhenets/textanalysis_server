@@ -1,4 +1,3 @@
-/* Базовая сетка */
 .sent-summary {
   display: flex; gap: 12px; margin: 12px 0 8px;
 }
@@ -10,12 +9,10 @@
 .sent-chip__value { font-size: 18pt; font-weight: 700; color: #111827; line-height: 1.1; }
 .sent-chip__pct   { font-size: 10pt; color: #6b7280; }
 
-/* Цветовые акценты */
 .sent-chip.pos { border-color: #cdeae0; background: #f3fcf8; }
 .sent-chip.neu { border-color: #e1e5eb; background: #fbfbfc; }
 .sent-chip.neg { border-color: #f5c9c9; background: #fff6f6; }
 
-/* Прогресс-бар (стек: pos → neu → neg) */
 .sent-progress {
   display: flex; height: 10px; margin: 6px 0 18px; border-radius: 6px; overflow: hidden; background: #eef1f5;
 }
@@ -23,7 +20,6 @@
 .sent-progress .bar.neu { background: #9aa3af; }
 .sent-progress .bar.neg { background: #ef6060; }
 
-/* Список предложений */
 .sent-list { display: grid; gap: 10px; }
 .sent-item {
   border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; background: #ffffff;

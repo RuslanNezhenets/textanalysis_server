@@ -1,8 +1,6 @@
 import re
-import spacy
 
 from collections import Counter
-from functools import lru_cache
 from typing import Dict, Any, List, Tuple
 
 from services.text_preprocessing_service import get_paragraphs_by_text, get_documents_by_text, get_sentences_by_text
@@ -14,9 +12,7 @@ APOS = {"'", "’", "ʼ", "`", "´", "ʻ"}
 def count_syllables_uk(word: str) -> int:
     if not word:
         return 1
-    # оставляем только буквы и апостроф (апостроф можно и удалить — неважно)
     w = "".join(ch for ch in word if ch.isalpha() or ch in APOS)
-    # считаем КАЖДУЮ гласную как слог
     cnt = sum(1 for ch in w if ch in UA_VOWELS)
     return max(1, cnt)
 
@@ -71,57 +67,57 @@ def compute_text_stats(
     top_n_bigrams: int = 10
 ) -> Dict[str, Any]:
     """
-    Возвращает словарь с численной статистикой текста:
-    - базовые размеры;
-    - средние показатели;
-    - словарное разнообразие;
-    - лексическая плотность (content vs function words);
-    - топ-N слов и биграмм (по леммам, без стоп-слов).
+    Повертає словник із чисельною статистикою тексту:
+    - базові розміри;
+    - Середні показники;
+    - словникова різноманітність;
+    - лексична щільність (content vs function words);
+    - топ-N слів та біграм (за лемами, без стоп-слів).
     """
 
-    # абзацы считаем по пустым строкам / переводам
+    # абзаци рахуємо за порожніми рядками / перекладами
     paragraphs = get_paragraphs_by_text(text)
     paragraphs_count = len(paragraphs)
 
-    # нормализуем подряд идущие пробелы
+    # нормалізуємо пробіли, що йдуть поспіль
     chars_with_spaces = len(text)
     chars_no_spaces = len(re.sub(r"\s+", "", text))
 
-    # --- предложения ---
+    # --- речення ---
     sentences = get_sentences_by_text(text)
     sentences_count = len(sentences)
 
-    # --- токены (слова) ---
-    # "все слова" = токены-алфавитные, без цифр и пунктуации (для средних длин и читабельных метрик)
+    # --- токени (слова) ---
+    # "всі слова" = токени-алфавітні, без цифр та пунктуації (для середніх довжин та читабельних метрик)
     doc = get_documents_by_text(text)
     all_word_tokens = [t for t in doc if t.is_alpha]
     all_words_lemmas = [t.lemma_.lower() for t in all_word_tokens]
 
-    # "содержательные слова" = без стоп-слов
+    # "змістовні слова" = без стоп-слів
     content_tokens = [t for t in all_word_tokens if not t.is_stop]
     content_lemmas = [t.lemma_.lower() for t in content_tokens]
 
-    # функция слова = stop-слова (служебные) среди алфавитных
+    # функція слова = stop-слова (службові) серед алфавітних
     function_tokens = [t for t in all_word_tokens if t.is_stop]
 
     words_count = len(all_word_tokens)
     unique_words_count = len(set(all_words_lemmas))
     hapax_count = sum(1 for w, c in Counter(all_words_lemmas).items() if c == 1)
 
-    # средние показатели
+    # середні показники
     avg_word_len = (sum(len(t.text) for t in all_word_tokens) / words_count) if words_count else 0.0
     avg_sent_len = (words_count / sentences_count) if sentences_count else 0.0
     max_word_len = max((len(t.text) for t in all_word_tokens), default=0)
     avg_sents_per_para = (sentences_count / paragraphs_count) if paragraphs_count else 0.0
 
-    # словарное разнообразие
+    # словникова різноманітність
     lexical_diversity = (unique_words_count / words_count) if words_count else 0.0
 
-    # лексическая плотность
+    # лексична щільність
     content_ratio = (len(content_tokens) / words_count) if words_count else 0.0
     function_ratio = (len(function_tokens) / words_count) if words_count else 0.0
 
-    # --- индексы (UA) ---
+    # --- індекси (UA) ---
     syll_counts = [count_syllables_uk(t.text) for t in all_word_tokens]
     avg_syll_per_word = (sum(syll_counts) / len(syll_counts)) if all_word_tokens else 0.0
     ua_readability = round(_readability_ua(avg_sent_len, avg_syll_per_word), 1)
@@ -129,7 +125,7 @@ def compute_text_stats(
     ua_perception = _perception_ua(ua_readability, content_ratio)
     ua_perception_level = _perception_level_ua(ua_perception)
 
-    # распределение частей речи по содержательным словам (наглядно)
+    # розподіл частин мови за змістовними словами (наочно)
     raw_pos_counts = Counter(t.pos_ for t in content_tokens)
 
     POS_UA_MAP = {
@@ -162,16 +158,15 @@ def compute_text_stats(
         sorted(translated_pos_counts.items(), key=lambda x: x[1], reverse=True)
     )
 
-    # частоты слов (по леммам содержательных слов)
+    # частоти слів (за лемами змістовних слів)
     word_freq = Counter(content_lemmas)
     top_words: List[Tuple[str, int]] = word_freq.most_common(top_n_words)
 
-    # биграммы (по леммам содержательных слов)
+    # біграми (за лемами змістовних слів)
     bigrams = [" ".join(pair) for pair in zip(content_lemmas, content_lemmas[1:])]
     bigram_freq = Counter(bigrams)
     top_bigrams: List[Tuple[str, int]] = bigram_freq.most_common(top_n_bigrams)
 
-    # --- итоговый JSON-совместимый dict ---
     return {
         "basic": {
             "chars_with_spaces": chars_with_spaces,
@@ -188,13 +183,13 @@ def compute_text_stats(
             "avg_sentences_per_paragraph": round(avg_sents_per_para, 2),
         },
         "vocabulary": {
-            "lexical_diversity_ratio": round(lexical_diversity, 3),  # уникальные/все
+            "lexical_diversity_ratio": round(lexical_diversity, 3),  # унікальні/всі
             "hapax_count": hapax_count,
         },
         "lexical_density": {
             "content_words_ratio": round(content_ratio, 3),
             "function_words_ratio": round(function_ratio, 3),
-            "pos_distribution": pos_distribution,  # например: {"NOUN": 120, "VERB": 95, ...}
+            "pos_distribution": pos_distribution,  # наприклад: {"NOUN": 120, "VERB": 95, ...}
         },
         "frequency": {
             "top_words": top_words,       # список пар [("слово", частота), ...]

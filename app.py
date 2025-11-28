@@ -65,10 +65,6 @@ app.include_router(auth_router)
 
 @app.post("/api/stats", response_model=Dict[str, Any])
 def text_stats(req: StatsRequest):
-    """
-    Возвращает численную статистику текста (слова, предложения, уникальные, средние,
-    лексическая плотность, топ-слова/биграммы, оценка времени чтения и т.д.).
-    """
     if not req.text or len(req.text.strip()) < 2:
         raise HTTPException(400, "Пустой или слишком короткий текст")
 
@@ -142,10 +138,6 @@ def text_sentiment(req: SentimentRequest):
 
 @app.post("/api/segment", response_model=ClassifyResponse, response_model_exclude_none=True)
 def segment_text(req: SegmentationRequest):
-    """
-    Делим текст на блоки и сразу классифицируем каждый блок по тематикам.
-    Результат тематической классификации кладём в block.topics_top
-    """
     if not req.text or len(req.text.strip()) < 5:
         raise HTTPException(400, "Пустой или слишком короткий текст")
     try:
