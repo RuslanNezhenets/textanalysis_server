@@ -37,15 +37,48 @@ def _ensure_owner(doc: dict, user_id: str):
     if doc.get("user_id") != user_id:
         raise HTTPException(403, "forbidden")
 
+def _create_empty_tab(
+    coll: Collection,
+    user_id: str,
+    title: str | None = None,
+) -> dict:
+    """
+    Универсальный helper для создания пустой вкладки.
+    Используется:
+      - в create_tab (ручное создание),
+      - в list_tabs (если у пользователя нет вкладок),
+      - в delete_tab (если удалили последнюю).
+    """
+    now = datetime.utcnow()
+    new_doc = {
+        "_id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "title": title or "Нова вкладка",
+        "created_at": now,
+        "updated_at": now,
+        "text_id": 0,
+        "text": "",
+        "analysis": {"stats": None, "sentiment": None, "segment": None, "intent": None},
+    }
+    coll.insert_one(new_doc)
+    return new_doc
+
 @router.get("/tabs", response_model=list[WorkspaceTabLight])
 def list_tabs(coll: Collection = Depends(_tabs),
               user=Depends(get_current_user)):
     cursor = coll.find(
         {"user_id": user["_id"]},
         {"_id": 1, "title": 1, "created_at": 1},
-        sort=[("created_at", 1)]
+        sort=[("created_at", 1)],
     )
-    return [_doc_to_light(doc) for doc in cursor]
+
+    docs = list(cursor)
+
+    if not docs:
+        doc = _create_empty_tab(coll, user["_id"])
+        docs = [doc]
+
+    return [_doc_to_light(doc) for doc in docs]
 
 @router.get("/tabs/{tab_id}", response_model=WorkspaceTabFull)
 def get_tab_full(tab_id: str,
@@ -62,18 +95,8 @@ def get_tab_full(tab_id: str,
 def create_tab(body: NewTabRequest | None = None,
                coll: Collection = Depends(_tabs),
                user=Depends(get_current_user)):
-    now = datetime.utcnow()
-    new_doc = {
-        "_id": str(uuid.uuid4()),
-        "user_id": user["_id"],          # ← привязка владельца
-        "title": body.title if body and body.title else "Нова вкладка",
-        "created_at": now,
-        "updated_at": now,
-        "text_id": 0,
-        "text": "",
-        "analysis": {"stats": None, "sentiment": None, "segment": None, "intent": None}
-    }
-    coll.insert_one(new_doc)
+    title = body.title if body and body.title else "Нова вкладка"
+    new_doc = _create_empty_tab(coll, user["_id"], title=title)
     return _doc_to_full(new_doc)
 
 @router.patch("/tabs/{tab_id}", response_model=WorkspaceTabFull)
@@ -103,14 +126,17 @@ def delete_tab(tab_id: str,
         raise HTTPException(404, "tab not found")
     _ensure_owner(doc, user["_id"])
 
+    tabs_count = coll.count_documents({"user_id": user["_id"]})
+    is_last = tabs_count <= 1
+
     coll.delete_one({"_id": tab_id})
-    return {"ok": True}
+
+    if is_last:
+        _create_empty_tab(coll, user["_id"])
+
+    return {"ok": True,  "update_needed": is_last}
 
 def get_tab_full_service(coll: Collection, tab_id: str) -> dict:
-    """
-    Простой helper: достаёт вкладку по id (без учёта пользователя).
-    Удобен для внутренних сервисов (например /api/stats).
-    """
     doc = coll.find_one({"_id": tab_id})
     if not doc:
         raise HTTPException(404, "tab not found")
@@ -121,13 +147,6 @@ def apply_tab_patch(
     tab_id: str,
     patch_data: Dict[str, Any],
 ) -> dict:
-    """
-    Универсальный сервисный апдейтер вкладки.
-    НИЧЕГО не знает о пользователях — просто патчит документ.
-    Его можно вызывать:
-      - из роутеров (после проверки владельца, если нужно),
-      - из других сервисов (/api/stats, /api/segment и т.п.).
-    """
     doc = coll.find_one({"_id": tab_id})
     if not doc:
         raise HTTPException(404, "tab not found")
@@ -139,10 +158,8 @@ def apply_tab_patch(
         if field in patch_data:
             update_payload[field] = patch_data[field]
 
-    # в любом апдейте обновляем updated_at
     update_payload["updated_at"] = datetime.utcnow()
 
-    # если реально нечего менять кроме updated_at — не трогаем базу
     if len(update_payload) == 1 and "updated_at" in update_payload:
         return doc
 
