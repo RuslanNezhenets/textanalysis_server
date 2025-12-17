@@ -16,6 +16,7 @@ def normalize_soft(s: str) -> str:
     s = s.replace("\u00A0", " ").replace("\u200B", "")
     s = re.sub(r"https?://\S+|www\.\S+", "", s)
     s = re.sub(r"[ \t]+", " ", s)
+    s = s.replace("тис.", "тис")
     s = "\n".join(line.strip() for line in s.splitlines())
     return s.strip()
 
@@ -26,6 +27,7 @@ def normalize_for_spacy(s: str) -> str:
     s = s.replace("\u00A0", " ").replace("\u200B", "")
     s = re.sub(r"https?://\S+|www\.\S+", "", s)
     s = re.sub(r"\s+", " ", s).strip()
+    s = s.replace("тис.", "тис")
     return s
 
 def get_documents_by_text(text):
